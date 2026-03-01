@@ -1,0 +1,24 @@
+{
+  "name": "galdur",
+  "version": "0.0.1",
+  "description": "Obsidian plugin that embeds AI CLI tools in a sidebar terminal.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node build.mjs --watch",
+    "build": "node build.mjs --production",
+    "check": "tsc --noEmit --skipLibCheck",
+    "postinstall": "node scripts/patch-node-pty-worker.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.8.7",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0"
+  }
+}

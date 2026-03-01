@@ -1,0 +1,10 @@
+{
+  "id": "galdur",
+  "name": "Galdur",
+  "version": "0.0.1",
+  "minAppVersion": "1.5.0",
+  "description": "Embed AI CLI tool sessions in an Obsidian sidebar terminal panel.",
+  "author": "Kyle Undefined",
+  "authorUrl": "https://github.com/Kyle-Undefined",
+  "isDesktopOnly": true
+}
