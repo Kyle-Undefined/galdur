@@ -2,16 +2,15 @@ import { join } from 'path';
 import {
     DEFAULT_TOOL_PROFILE,
     OBSIDIAN_DIR,
+    PERMISSION_MODE_OPTIONS,
     PLUGINS_DIR,
     PLUGIN_ID,
     TOOL_ARG_DEBUG_FILE,
     TOOL_ARG_PERMISSION_MODE,
 } from '../constants';
-import { CliTool, CommandResolution, GaldurSettings } from '../types';
+import { CliTool, CliToolSettingsSpec, CommandResolution, GaldurSettings } from '../types';
 import { resolveExecutable } from '../services/executableResolver';
-import { tokenizeArgLine } from '../utils/cliArgs';
-
-type CommonPathPattern = { envVar: string; subPath: string; names: readonly string[] };
+import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const CLAUDE_TOOL_ID = 'claude';
 const CLAUDE_DISPLAY_NAME = 'Claude';
@@ -26,7 +25,7 @@ const CLAUDE_PATH_NAMES_PREFER_CMD = [CLAUDE_BINARY_CMD, CLAUDE_BINARY_EXE] as c
 const CLAUDE_PATH_NAMES_PREFER_EXE = [CLAUDE_BINARY_EXE, CLAUDE_BINARY_CMD] as const;
 const CLAUDE_PATH_CANDIDATES = [CLAUDE_BINARY_CMD, CLAUDE_BINARY_EXE, CLAUDE_BINARY] as const;
 
-const CLAUDE_COMMON_PATHS: CommonPathPattern[] = [
+const CLAUDE_COMMON_PATHS = [
     { envVar: 'APPDATA', subPath: 'npm', names: CLAUDE_PATH_NAMES_PREFER_CMD },
     {
         envVar: 'USERPROFILE',
@@ -43,21 +42,7 @@ const CLAUDE_COMMON_PATHS: CommonPathPattern[] = [
         subPath: 'pnpm',
         names: CLAUDE_PATH_NAMES_PREFER_CMD,
     },
-];
-
-function expandCommonPaths(patterns: CommonPathPattern[]): string[] {
-    const candidates: string[] = [];
-    for (const { envVar, subPath, names } of patterns) {
-        const base = process.env[envVar];
-        if (!base) {
-            continue;
-        }
-        for (const name of names) {
-            candidates.push(join(base, subPath, name));
-        }
-    }
-    return candidates;
-}
+] as const;
 
 export class ClaudeTool implements CliTool {
     public readonly id = CLAUDE_TOOL_ID;
@@ -94,16 +79,16 @@ export class ClaudeTool implements CliTool {
     public getMissingCliHelp(): string {
         return CLAUDE_MISSING_CLI_HELP;
     }
-}
 
-function parseExtraArgs(raw: string): string[] {
-    const tokens: string[] = [];
-    for (const rawLine of raw.split(/\r?\n/)) {
-        const line = rawLine.trim();
-        if (!line) {
-            continue;
-        }
-        tokens.push(...tokenizeArgLine(line));
+    public getSettingsSpec(): CliToolSettingsSpec {
+        return {
+            supportedPermissionModes: PERMISSION_MODE_OPTIONS,
+            permissionModeDescription: `Passed as ${TOOL_ARG_PERMISSION_MODE} when supported by ${this.displayName}.`,
+            supportsDebugLogging: true,
+            debugLoggingDescription: 'When enabled, writes tool debug output to a debug log file in the plugin folder.',
+            extraArgsDescription:
+                'Optional extra args for the active tool. One command fragment per line, e.g. --model sonnet',
+            extraArgsPlaceholder: '--model sonnet\n--append-system-prompt "Prefer small, focused diffs"',
+        };
     }
-    return tokens;
 }

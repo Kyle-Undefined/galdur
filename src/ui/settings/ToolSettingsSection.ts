@@ -1,11 +1,5 @@
 import { Setting } from 'obsidian';
-import {
-    DEFAULT_TOOL_PROFILE,
-    PERMISSION_MODE_OPTIONS,
-    TOOL_ARG_PERMISSION_MODE,
-    TOOL_EXTRA_ARGS_ROWS,
-    TOOL_OPTIONS,
-} from '../../constants';
+import { DEFAULT_TOOL_PROFILE, PERMISSION_MODE_OPTIONS, TOOL_EXTRA_ARGS_ROWS, TOOL_OPTIONS } from '../../constants';
 import { getTool } from '../../tools/toolRegistry';
 import { GaldurSettingsStore, ToolId, ToolLaunchProfile, ToolPermissionMode } from '../../types';
 
@@ -20,6 +14,9 @@ export class ToolSettingsSection {
     public constructor(private readonly deps: ToolSettingsSectionDeps) {}
 
     public render(containerEl: HTMLElement): void {
+        const activeTool = getTool(this.deps.store.settings.activeToolId);
+        const settingsSpec = activeTool.getSettingsSpec();
+
         new Setting(containerEl)
             .setName('Active CLI tool')
             .setDesc('Tool opened in the Galdur terminal panel.')
@@ -40,9 +37,9 @@ export class ToolSettingsSection {
 
         new Setting(containerEl)
             .setName('Permission mode')
-            .setDesc(`Passed as ${TOOL_ARG_PERMISSION_MODE} when supported by the active tool.`)
+            .setDesc(settingsSpec.permissionModeDescription)
             .addDropdown((dropdown) => {
-                for (const mode of PERMISSION_MODE_OPTIONS) {
+                for (const mode of settingsSpec.supportedPermissionModes) {
                     dropdown.addOption(mode, mode);
                 }
                 dropdown.setValue(this.getActiveProfile().permissionMode).onChange(async (value) => {
@@ -59,9 +56,13 @@ export class ToolSettingsSection {
 
         new Setting(containerEl)
             .setName('Debug logging')
-            .setDesc('When enabled, writes tool debug output to a debug log file in the plugin folder.')
+            .setDesc(settingsSpec.debugLoggingDescription)
             .addToggle((toggle) => {
+                toggle.setDisabled(!settingsSpec.supportsDebugLogging);
                 toggle.setValue(this.getActiveProfile().debugLoggingEnabled).onChange(async (value) => {
+                    if (!settingsSpec.supportsDebugLogging) {
+                        return;
+                    }
                     this.updateActiveProfile((profile) => ({
                         ...profile,
                         debugLoggingEnabled: value,
@@ -72,9 +73,9 @@ export class ToolSettingsSection {
 
         new Setting(containerEl)
             .setName('Tool extra args')
-            .setDesc('Optional extra args for the active tool. One command fragment per line, e.g. --model sonnet')
+            .setDesc(settingsSpec.extraArgsDescription)
             .addTextArea((text) => {
-                text.setPlaceholder('--model sonnet\n--arg2 value')
+                text.setPlaceholder(settingsSpec.extraArgsPlaceholder)
                     .setValue(this.getActiveProfile().extraArgs)
                     .onChange((value) => {
                         this.updateActiveProfile((profile) => ({

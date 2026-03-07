@@ -1,8 +1,9 @@
 import { CliTool, ToolId } from '../types';
 import { swallowError } from '../utils/logging';
 import { ClaudeTool } from './ClaudeTool';
+import { CodexTool } from './CodexTool';
 
-const tools: CliTool[] = [new ClaudeTool()];
+const tools: CliTool[] = [new ClaudeTool(), new CodexTool()];
 const toolMap = new Map<ToolId, CliTool>(tools.map((tool) => [tool.id, tool]));
 
 export function getTool(toolId: ToolId): CliTool {

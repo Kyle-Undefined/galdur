@@ -18,7 +18,8 @@ const RM_RETRY_OPTIONS = { maxRetries: RM_MAX_RETRIES, retryDelay: RM_RETRY_DELA
 
 export async function atomicReplace(fromPath: string, toPath: string): Promise<void> {
     await withBackupSwap(toPath, {
-        clearBackup: async (backupPath) => await rm(backupPath, { force: true, ...RM_RETRY_OPTIONS }).catch(() => undefined),
+        clearBackup: async (backupPath) =>
+            await rm(backupPath, { force: true, ...RM_RETRY_OPTIONS }).catch(() => undefined),
         replace: async () => {
             try {
                 await rename(fromPath, toPath);
@@ -35,7 +36,8 @@ export async function atomicReplace(fromPath: string, toPath: string): Promise<v
                 throw renameError;
             }
         },
-        deleteBackup: async (backupPath) => await rm(backupPath, { force: true, ...RM_RETRY_OPTIONS }).catch(() => undefined),
+        deleteBackup: async (backupPath) =>
+            await rm(backupPath, { force: true, ...RM_RETRY_OPTIONS }).catch(() => undefined),
     });
 }
 

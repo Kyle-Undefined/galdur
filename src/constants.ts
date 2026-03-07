@@ -22,7 +22,7 @@ export const NODE_MODULES_DIR = 'node_modules';
 export const RUNTIME_DIR = 'runtime';
 export const RUNTIME_DIST_DIR = 'dist';
 
-export const TOOL_OPTIONS: ToolId[] = ['claude'];
+export const TOOL_OPTIONS: ToolId[] = ['claude', 'codex'];
 export const TOOL_ARG_DEBUG_FILE = '--debug-file';
 export const TOOL_ARG_PERMISSION_MODE = '--permission-mode';
 
@@ -86,6 +86,9 @@ export const DEFAULT_SETTINGS: GaldurSettings = {
     activeToolId: 'claude',
     toolProfiles: {
         claude: {
+            ...DEFAULT_TOOL_PROFILE,
+        },
+        codex: {
             ...DEFAULT_TOOL_PROFILE,
         },
     },

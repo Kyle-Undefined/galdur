@@ -1,4 +1,4 @@
-export type ToolId = 'claude';
+export type ToolId = 'claude' | 'codex';
 
 export type CommandResolution = {
     command: string;
@@ -14,6 +14,15 @@ export interface ToolLaunchProfile {
     extraArgs: string;
     debugLoggingEnabled: boolean;
 }
+
+export type CliToolSettingsSpec = {
+    supportedPermissionModes: readonly ToolPermissionMode[];
+    permissionModeDescription: string;
+    supportsDebugLogging: boolean;
+    debugLoggingDescription: string;
+    extraArgsDescription: string;
+    extraArgsPlaceholder: string;
+};
 
 export interface GaldurSettings {
     activeToolId: ToolId;
@@ -44,6 +53,7 @@ export interface CliTool {
     getDebugLogPath(vaultPath: string): string;
     buildArgs(settings: GaldurSettings, debugFilePath?: string): string[];
     getMissingCliHelp(): string;
+    getSettingsSpec(): CliToolSettingsSpec;
 }
 
 import type { TerminalExitEvent } from '../shared/ipc-types';
