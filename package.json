@@ -1,11 +1,13 @@
 {
     "name": "galdur",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "description": "Obsidian plugin that embeds AI CLI tools in a sidebar terminal.",
     "main": "main.js",
     "scripts": {
         "dev": "tsx build.ts --watch",
         "build": "tsx build.ts --production",
+        "test": "node --import tsx --test tests/**/*.test.ts",
+        "test:watch": "node --import tsx --test --watch tests/**/*.test.ts",
         "check": "tsc --noEmit --skipLibCheck",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

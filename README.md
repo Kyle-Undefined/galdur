@@ -9,13 +9,17 @@ Galdur is an Obsidian plugin that opens AI CLI tool sessions inside a sidebar te
     npm install
     ```
 2. Build once:
-    ```bash
-    npm run build
-    ```
-3. Watch mode:
-    ```bash
-    npm run dev
-    ```
+   ```bash
+   npm run build
+   ```
+3. Run tests:
+   ```bash
+   npm test
+   ```
+4. Watch mode:
+   ```bash
+   npm run dev
+   ```
 
 ## Runtime Architecture
 
