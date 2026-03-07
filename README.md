@@ -17,12 +17,23 @@ Galdur is an Obsidian plugin that opens AI CLI tool sessions inside a sidebar te
    npm run dev
    ```
 
+## Runtime Architecture
+
+Galdur now runs terminal work through a separate runtime executable instead of hosting `node-pty` directly in the main plugin process.
+
+- The Obsidian plugin remains responsible for UI, settings, install/update flows, and runtime lifecycle.
+- The managed runtime is a Windows executable placed under `.obsidian/plugins/galdur/bin/`.
+- The plugin starts the runtime with a per-launch named pipe path plus protocol version args, and sends an auth token via environment variable.
+- Plugin and runtime communicate over a local newline-delimited JSON IPC protocol for commands like `ping`, `spawn`, `write`, `resize`, and `kill`.
+- The runtime owns the PTY/session work and emits async events back to the plugin over the same pipe.
+
 ## Runtime Packaging Notes
 
-Galdur uses `node-pty` for interactive terminal behavior.
+Galdur still uses `node-pty` for interactive terminal behavior, but it now lives inside the separate runtime process.
 
 - `main.js`, `manifest.json`, and `styles.css` are still required plugin artifacts.
-- `node-pty` is externalized from the bundle (native module), so the runtime dependency must also be available in the plugin directory.
+- The plugin bundle and the runtime are separate artifacts. The plugin talks to the runtime over IPC instead of calling `node-pty` directly.
+- `node-pty` is externalized from the runtime bundle (native module), so the runtime dependency must also be available in the plugin directory.
 - `npm install` applies a compatibility patch to `node-pty` for Windows Obsidian runtimes that cannot construct worker threads.
 - On Windows, Galdur currently forces `node-pty` to `winpty` mode (`useConpty: false`) for better compatibility with Obsidian's runtime.
 - Easiest option for local dev:

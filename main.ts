@@ -1,1 +1,1 @@
-export { default } from "./src/GaldurPlugin";
+export { default } from './src/GaldurPlugin';
