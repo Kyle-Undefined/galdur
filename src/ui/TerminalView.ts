@@ -94,7 +94,11 @@ export class TerminalView extends ItemView {
         const pendingStart = this.startPromise;
         if (pendingStart) {
             await pendingStart.catch(swallowError);
-            if (this.isClosed || this.activeBackend || (this.startPromise !== null && this.startPromise !== pendingStart)) {
+            if (
+                this.isClosed ||
+                this.activeBackend ||
+                (this.startPromise !== null && this.startPromise !== pendingStart)
+            ) {
                 return;
             }
         }

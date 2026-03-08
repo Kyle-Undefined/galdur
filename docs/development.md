@@ -23,6 +23,25 @@
     npm run dev
     ```
 
+## Release versioning
+
+Use `bumpp` plus a small TypeScript post-step to keep plugin release metadata in sync:
+
+```bash
+npm run version:bump -- patch
+npm run version:bump -- minor
+npm run version:bump -- 0.6.0
+```
+
+This updates:
+
+- `package.json`
+- `manifest.json`
+- `versions.json`
+- `package-lock.json`
+
+`bumpp` handles `package.json`, `manifest.json`, and `package-lock.json`. A small TypeScript post-step then syncs the matching `versions.json` entry from the bumped plugin version and `manifest.json`'s `minAppVersion`.
+
 ## Runtime architecture
 
 Galdur uses a managed local runtime process for PTY-backed terminal sessions.
