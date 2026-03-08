@@ -1,4 +1,4 @@
-import { GaldurSettings, RuntimeInstallStatus } from '../../types';
+import { GaldurSettings, RuntimeInstallStatus, VaultPaths } from '../../types';
 import { tokenizeCommandLine } from '../../utils/cliArgs';
 import { looksLikePath } from '../../utils/strings';
 import { commandExistsOnPath } from '../../utils/process';
@@ -13,12 +13,12 @@ export class StatusService {
     ) {}
 
     public async getInstallStatus(
-        vaultPath: string,
+        vaultPaths: VaultPaths,
         settings: GaldurSettings,
         pluginVersion: string
     ): Promise<RuntimeInstallStatus> {
-        const runtimePath = this.paths.getResolvedRuntimePath(vaultPath, settings);
-        const installDir = this.paths.getRuntimeInstallDir(vaultPath);
+        const runtimePath = this.paths.getResolvedRuntimePath(vaultPaths, settings);
+        const installDir = this.paths.getRuntimeInstallDir(vaultPaths);
         const isCustomPath = (settings.runtimePath?.trim()?.length ?? 0) > 0;
         const targetVersion = pluginVersion;
         const supportError = this.paths.getSupportError();
@@ -52,7 +52,7 @@ export class StatusService {
             };
         }
 
-        const installedVersion = await this.getInstalledRuntimeVersion(vaultPath, runtimePath);
+        const installedVersion = await this.getInstalledRuntimeVersion(vaultPaths, runtimePath);
         if (!installedVersion) {
             return {
                 state: 'installed',
@@ -157,13 +157,13 @@ export class StatusService {
         };
     }
 
-    private async getInstalledRuntimeVersion(vaultPath: string, runtimePath: string): Promise<string | null> {
+    private async getInstalledRuntimeVersion(vaultPaths: VaultPaths, runtimePath: string): Promise<string | null> {
         const probedVersion = await probeRuntimeVersion(runtimePath);
         if (probedVersion) {
             return probedVersion;
         }
 
-        const parsed = await this.metadata.read(vaultPath);
+        const parsed = await this.metadata.read(vaultPaths);
         if (parsed && parsed.runtimePath === runtimePath && typeof parsed.version === 'string') {
             return parsed.version;
         }

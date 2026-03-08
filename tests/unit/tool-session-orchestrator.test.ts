@@ -13,6 +13,7 @@ import type {
     TerminalExitEvent,
     TerminalSessionStartOptions,
     TerminalSessionStartResult,
+    VaultPaths,
 } from '../../src/types';
 import type {
     MissingToolCommand,
@@ -69,6 +70,14 @@ function createHooks(): {
     };
 }
 
+function createVaultPaths(): VaultPaths {
+    return {
+        vaultPath: 'C:\\vault',
+        configDir: '.obsidian',
+        pluginDir: 'C:\\vault\\.obsidian\\plugins\\galdur',
+    };
+}
+
 function createTool(
     resolution: CommandResolution,
     buildArgsImpl?: (debugFilePath?: string) => string[]
@@ -90,8 +99,8 @@ function createTool(
         async resolveCommand() {
             return resolution;
         },
-        getDebugLogPath(vaultPath: string) {
-            return join(vaultPath, '.obsidian', 'plugins', 'galdur', 'claude-debug.log');
+        getDebugLogPath(vaultPaths: VaultPaths) {
+            return join(vaultPaths.pluginDir, 'claude-debug.log');
         },
         buildArgs(_settings, debugFilePath) {
             buildArgCalls.push(debugFilePath);
@@ -144,7 +153,7 @@ test('orchestrateToolSessionLaunch returns missing-cli and reports the missing c
     const result = await orchestrateToolSessionLaunch({
         settings: cloneSettings(),
         tool,
-        vaultPath: 'C:\\vault',
+        vaultPaths: createVaultPaths(),
         terminal: { cols: 120, rows: 40 },
         createBackend: () => {
             backendCreated = true;
@@ -186,7 +195,7 @@ test('orchestrateToolSessionLaunch prepares and starts a backend with clamped te
         const result = await orchestrateToolSessionLaunch({
             settings,
             tool,
-            vaultPath: 'C:\\vault',
+            vaultPaths: createVaultPaths(),
             terminal: { cols: 10, rows: 12 },
             createBackend: () => backend,
             isStale: () => false,
@@ -234,7 +243,7 @@ test('orchestrateToolSessionLaunch stops the backend when start fails', async ()
     const result = await orchestrateToolSessionLaunch({
         settings: cloneSettings(),
         tool,
-        vaultPath: 'C:\\vault',
+        vaultPaths: createVaultPaths(),
         terminal: { cols: 120, rows: 40 },
         createBackend: () => backend,
         isStale: () => false,
@@ -265,7 +274,7 @@ test('orchestrateToolSessionLaunch stops the backend and returns aborted when it
     const result = await orchestrateToolSessionLaunch({
         settings: cloneSettings(),
         tool,
-        vaultPath: 'C:\\vault',
+        vaultPaths: createVaultPaths(),
         terminal: { cols: 120, rows: 40 },
         createBackend: () => backend,
         isStale: () => stale,

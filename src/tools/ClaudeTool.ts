@@ -1,14 +1,11 @@
 import { join } from 'path';
 import {
     DEFAULT_TOOL_PROFILE,
-    OBSIDIAN_DIR,
     PERMISSION_MODE_OPTIONS,
-    PLUGINS_DIR,
-    PLUGIN_ID,
     TOOL_ARG_DEBUG_FILE,
     TOOL_ARG_PERMISSION_MODE,
 } from '../constants';
-import { CliTool, CliToolSettingsSpec, CommandResolution, GaldurSettings } from '../types';
+import { CliTool, CliToolSettingsSpec, CommandResolution, GaldurSettings, VaultPaths } from '../types';
 import { resolveExecutable } from '../services/executableResolver';
 import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
@@ -57,8 +54,8 @@ export class ClaudeTool implements CliTool {
         });
     }
 
-    public getDebugLogPath(vaultPath: string): string {
-        return join(vaultPath, OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID, CLAUDE_DEBUG_LOG_FILE);
+    public getDebugLogPath(vaultPaths: VaultPaths): string {
+        return join(vaultPaths.pluginDir, CLAUDE_DEBUG_LOG_FILE);
     }
 
     public buildArgs(settings: GaldurSettings, debugFilePath?: string): string[] {

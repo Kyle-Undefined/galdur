@@ -1,5 +1,6 @@
 import { readFile, writeFile, rename, unlink } from 'fs/promises';
 import { randomUUID } from 'crypto';
+import { VaultPaths } from '../../types';
 import { pathExists } from './fileSystem';
 import { Paths } from './Paths';
 
@@ -14,8 +15,8 @@ export type VersionMetadata = {
 export class MetadataStore {
     public constructor(private readonly paths: Paths) {}
 
-    public async read(vaultPath: string): Promise<VersionMetadata | null> {
-        const metadataPath = this.paths.getVersionMetadataPath(vaultPath);
+    public async read(vaultPaths: VaultPaths): Promise<VersionMetadata | null> {
+        const metadataPath = this.paths.getVersionMetadataPath(vaultPaths);
         if (!(await pathExists(metadataPath))) {
             return null;
         }
@@ -28,8 +29,8 @@ export class MetadataStore {
         }
     }
 
-    public async write(vaultPath: string, metadata: VersionMetadata): Promise<void> {
-        const metadataPath = this.paths.getVersionMetadataPath(vaultPath);
+    public async write(vaultPaths: VaultPaths, metadata: VersionMetadata): Promise<void> {
+        const metadataPath = this.paths.getVersionMetadataPath(vaultPaths);
         const tempPath = `${metadataPath}.${randomUUID()}.tmp`;
         await writeFile(tempPath, JSON.stringify(metadata, null, 2), 'utf8');
         try {

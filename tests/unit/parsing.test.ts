@@ -63,10 +63,7 @@ test('expandCommonPaths skips unset env vars and expands candidate names in orde
             },
         ]);
 
-        assert.deepEqual(paths, [
-            'C:\\Users\\tester\\bin\\first.exe',
-            'C:\\Users\\tester\\bin\\second.exe',
-        ]);
+        assert.deepEqual(paths, ['C:\\Users\\tester\\bin\\first.exe', 'C:\\Users\\tester\\bin\\second.exe']);
     } finally {
         if (original === undefined) {
             delete process.env.GALDUR_TEST_BASE;

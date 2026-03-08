@@ -8,15 +8,25 @@ import { MIN_TERMINAL_COLS, MIN_TERMINAL_ROWS, TERM_ENV_VALUE } from '../../src/
 import { createTempDir, removeTempDir } from '../helpers/tempDir';
 import type { RuntimeDataEvent, RuntimeExitEvent } from '../../shared/ipc-types';
 import type { PtyModule, PtyProcess, TerminalExitEvent } from '../../runtime/src/types';
+import type { VaultPaths } from '../../src/types';
+import path from 'node:path';
 
 const testOnWindows = process.platform === 'win32' ? test : test.skip;
+
+function createVaultPaths(vaultPath: string): VaultPaths {
+    return {
+        vaultPath,
+        configDir: path.join(vaultPath, '.obsidian'),
+        pluginDir: path.join(vaultPath, '.obsidian', 'plugins', 'galdur'),
+    };
+}
 
 testOnWindows('MetadataStore.read returns null when the metadata file does not exist', async () => {
     const tempDir = await createTempDir();
     const store = new MetadataStore(new Paths());
 
     try {
-        const metadata = await store.read(tempDir);
+        const metadata = await store.read(createVaultPaths(tempDir));
 
         assert.equal(metadata, null);
     } finally {
@@ -27,13 +37,14 @@ testOnWindows('MetadataStore.read returns null when the metadata file does not e
 testOnWindows('MetadataStore.read returns null for malformed JSON', async () => {
     const tempDir = await createTempDir();
     const paths = new Paths();
-    const metadataPath = paths.getVersionMetadataPath(tempDir);
-    await mkdir(paths.getRuntimeInstallDir(tempDir), { recursive: true });
+    const vaultPaths = createVaultPaths(tempDir);
+    const metadataPath = paths.getVersionMetadataPath(vaultPaths);
+    await mkdir(paths.getRuntimeInstallDir(vaultPaths), { recursive: true });
     await writeFile(metadataPath, '{not-json}', 'utf8');
     const store = new MetadataStore(paths);
 
     try {
-        const metadata = await store.read(tempDir);
+        const metadata = await store.read(vaultPaths);
 
         assert.equal(metadata, null);
     } finally {
@@ -44,13 +55,14 @@ testOnWindows('MetadataStore.read returns null for malformed JSON', async () => 
 testOnWindows('MetadataStore.read returns null for invalid field types', async () => {
     const tempDir = await createTempDir();
     const paths = new Paths();
-    const metadataPath = paths.getVersionMetadataPath(tempDir);
-    await mkdir(paths.getRuntimeInstallDir(tempDir), { recursive: true });
+    const vaultPaths = createVaultPaths(tempDir);
+    const metadataPath = paths.getVersionMetadataPath(vaultPaths);
+    await mkdir(paths.getRuntimeInstallDir(vaultPaths), { recursive: true });
     await writeFile(metadataPath, JSON.stringify({ version: 123 }), 'utf8');
     const store = new MetadataStore(paths);
 
     try {
-        const metadata = await store.read(tempDir);
+        const metadata = await store.read(vaultPaths);
 
         assert.equal(metadata, null);
     } finally {
@@ -61,7 +73,8 @@ testOnWindows('MetadataStore.read returns null for invalid field types', async (
 testOnWindows('MetadataStore.write and read round-trip valid metadata', async () => {
     const tempDir = await createTempDir();
     const paths = new Paths();
-    await mkdir(paths.getRuntimeInstallDir(tempDir), { recursive: true });
+    const vaultPaths = createVaultPaths(tempDir);
+    await mkdir(paths.getRuntimeInstallDir(vaultPaths), { recursive: true });
     const store = new MetadataStore(paths);
     const expected = {
         version: '1.2.3',
@@ -72,8 +85,8 @@ testOnWindows('MetadataStore.write and read round-trip valid metadata', async ()
     };
 
     try {
-        await store.write(tempDir, expected);
-        const metadata = await store.read(tempDir);
+        await store.write(vaultPaths, expected);
+        const metadata = await store.read(vaultPaths);
 
         assert.deepEqual(metadata, expected);
     } finally {
@@ -84,7 +97,10 @@ testOnWindows('MetadataStore.write and read round-trip valid metadata', async ()
 testOnWindows('SessionManager spawns sessions, forwards data, writes, resizes, and kills active sessions', () => {
     const broadcasts: Array<RuntimeDataEvent | RuntimeExitEvent> = [];
     const fake = createFakePtyModule();
-    const manager = new SessionManager((event) => broadcasts.push(event), () => fake.module);
+    const manager = new SessionManager(
+        (event) => broadcasts.push(event),
+        () => fake.module
+    );
 
     const started = manager.spawn({
         command: 'claude',
@@ -135,7 +151,10 @@ testOnWindows('SessionManager spawns sessions, forwards data, writes, resizes, a
 testOnWindows('SessionManager broadcasts exits and disposes a session after the process exits', () => {
     const broadcasts: Array<RuntimeDataEvent | RuntimeExitEvent> = [];
     const fake = createFakePtyModule();
-    const manager = new SessionManager((event) => broadcasts.push(event), () => fake.module);
+    const manager = new SessionManager(
+        (event) => broadcasts.push(event),
+        () => fake.module
+    );
     const started = manager.spawn({
         command: 'codex',
         args: [],
@@ -160,7 +179,10 @@ testOnWindows('SessionManager broadcasts exits and disposes a session after the 
 
 testOnWindows('SessionManager.kill is a no-op for a missing session', () => {
     const fake = createFakePtyModule();
-    const manager = new SessionManager(() => undefined, () => fake.module);
+    const manager = new SessionManager(
+        () => undefined,
+        () => fake.module
+    );
 
     manager.kill({ sessionId: 'missing' });
 
@@ -171,10 +193,13 @@ testOnWindows('SessionManager.disposeAll kills every tracked session and clears 
     const fakeOne = createFakePtyModule(321);
     const fakeTwo = createFakePtyModule(654);
     let callCount = 0;
-    const manager = new SessionManager(() => undefined, () => {
-        callCount++;
-        return callCount === 1 ? fakeOne.module : fakeTwo.module;
-    });
+    const manager = new SessionManager(
+        () => undefined,
+        () => {
+            callCount++;
+            return callCount === 1 ? fakeOne.module : fakeTwo.module;
+        }
+    );
 
     const one = manager.spawn({
         command: 'one',

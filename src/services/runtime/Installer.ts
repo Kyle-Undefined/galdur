@@ -1,15 +1,8 @@
 import { randomUUID } from 'crypto';
 import { mkdir, rm, unlink } from 'fs/promises';
 import { dirname, join } from 'path';
-import {
-    OBSIDIAN_DIR,
-    PLUGINS_DIR,
-    PLUGIN_ID,
-    RUNTIME_CHECKSUM_FILE,
-    RUNTIME_DIR,
-    RUNTIME_DIST_DIR,
-    RUNTIME_RELEASE_BASE_URL,
-} from '../../constants';
+import { RUNTIME_CHECKSUM_FILE, RUNTIME_DIR, RUNTIME_DIST_DIR, RUNTIME_RELEASE_BASE_URL } from '../../constants';
+import { VaultPaths } from '../../types';
 import { extractZipArchive, pathExists, probeRuntimeVersion } from './fileSystem';
 import { atomicReplaceDirectory, removeManagedInstallDir } from './installFs';
 import { MetadataStore, VersionMetadata } from './MetadataStore';
@@ -28,11 +21,11 @@ export class Installer {
     }
 
     public async installRuntime(
-        vaultPath: string,
+        vaultPaths: VaultPaths,
         pluginVersion: string
     ): Promise<{ runtimePath: string; version: string }> {
         const target = this.paths.getTarget();
-        const installDir = this.paths.getRuntimeInstallDir(vaultPath);
+        const installDir = this.paths.getRuntimeInstallDir(vaultPaths);
         const runtimeAsset = this.paths.getRuntimeAssetName(target.platform, target.arch);
         const runtimeBundle = this.paths.getRuntimeBundleName(target.platform, target.arch);
         const runtimePath = join(installDir, runtimeAsset);
@@ -61,7 +54,7 @@ export class Installer {
             }
 
             return await this.installRuntimeBundle({
-                vaultPath,
+                vaultPaths,
                 pluginVersion,
                 installDir,
                 runtimeAsset,
@@ -80,8 +73,8 @@ export class Installer {
         }
     }
 
-    public async uninstallRuntime(vaultPath: string): Promise<void> {
-        const installDir = this.paths.getRuntimeInstallDir(vaultPath);
+    public async uninstallRuntime(vaultPaths: VaultPaths): Promise<void> {
+        const installDir = this.paths.getRuntimeInstallDir(vaultPaths);
         if (!(await pathExists(installDir))) {
             return;
         }
@@ -94,20 +87,20 @@ export class Installer {
         }
     }
 
-    public async hasLocalRuntimeSource(vaultPath: string): Promise<boolean> {
-        return (await this.tryResolveLocalBuiltRuntimeBundle(vaultPath)) !== null;
+    public async hasLocalRuntimeSource(vaultPaths: VaultPaths): Promise<boolean> {
+        return (await this.tryResolveLocalBuiltRuntimeBundle(vaultPaths)) !== null;
     }
 
     public async installLocalBuiltRuntime(
-        vaultPath: string,
+        vaultPaths: VaultPaths,
         pluginVersion: string
     ): Promise<{ runtimePath: string; version: string }> {
-        const installDir = this.paths.getRuntimeInstallDir(vaultPath);
-        const built = await this.resolveLocalBuiltRuntimeBundle(vaultPath);
+        const installDir = this.paths.getRuntimeInstallDir(vaultPaths);
+        const built = await this.resolveLocalBuiltRuntimeBundle(vaultPaths);
         const targetExePath = join(installDir, built.runtimeAsset);
 
         return await this.installRuntimeBundle({
-            vaultPath,
+            vaultPaths,
             pluginVersion,
             installDir,
             runtimeAsset: built.runtimeAsset,
@@ -130,24 +123,23 @@ export class Installer {
     }
 
     private async resolveLocalBuiltRuntimeBundle(
-        vaultPath: string
+        vaultPaths: VaultPaths
     ): Promise<{ bundlePath: string; runtimeAsset: string }> {
-        const resolved = await this.tryResolveLocalBuiltRuntimeBundle(vaultPath);
+        const resolved = await this.tryResolveLocalBuiltRuntimeBundle(vaultPaths);
         if (resolved) {
             return resolved;
         }
 
         throw new Error(
-            'Could not find local built runtime bundle under vault plugin runtime/dist. Build in repo, then copy runtime/dist into VAULT/.obsidian/plugins/galdur/runtime/dist.'
+            'Could not find a local built runtime bundle under the vault plugin runtime/dist folder. Build in this repo, then copy runtime/dist into your vault plugin folder before installing.'
         );
     }
 
     private async tryResolveLocalBuiltRuntimeBundle(
-        vaultPath: string
+        vaultPaths: VaultPaths
     ): Promise<{ bundlePath: string; runtimeAsset: string } | null> {
-        const pluginDir = join(vaultPath, OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID);
         const archCandidates = this.paths.getLocalArchCandidates();
-        const distCandidates = [join(pluginDir, RUNTIME_DIR, RUNTIME_DIST_DIR)];
+        const distCandidates = [join(vaultPaths.pluginDir, RUNTIME_DIR, RUNTIME_DIST_DIR)];
         const { platform } = this.paths.getTarget();
 
         for (const distDir of distCandidates) {
@@ -167,7 +159,7 @@ export class Installer {
     }
 
     private async installRuntimeBundle(params: {
-        vaultPath: string;
+        vaultPaths: VaultPaths;
         pluginVersion: string;
         installDir: string;
         runtimeAsset: string;
@@ -192,7 +184,7 @@ export class Installer {
             );
 
             await atomicReplaceDirectory(stageDir, params.installDir);
-            await this.metadata.write(params.vaultPath, params.createMetadata(runtimeVersion));
+            await this.metadata.write(params.vaultPaths, params.createMetadata(runtimeVersion));
 
             return {
                 runtimePath: params.runtimePath,

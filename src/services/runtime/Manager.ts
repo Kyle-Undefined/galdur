@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
 import { mkdir } from 'fs/promises';
 import { PLUGIN_ID } from '../../constants';
-import { GaldurSettings, RuntimeInstallStatus } from '../../types';
+import { GaldurSettings, RuntimeInstallStatus, VaultPaths } from '../../types';
 import { Installer } from './Installer';
 import { MetadataStore } from './MetadataStore';
 import { Paths } from './Paths';
@@ -25,54 +25,54 @@ export class Manager {
         this.installer = installer ?? new Installer(this.paths, this.metadata);
     }
 
-    public getRuntimeInstallDir(vaultPath: string): string {
-        return this.paths.getRuntimeInstallDir(vaultPath);
+    public getRuntimeInstallDir(vaultPaths: VaultPaths): string {
+        return this.paths.getRuntimeInstallDir(vaultPaths);
     }
 
-    public getRuntimeLogsDir(vaultPath: string): string {
-        return this.paths.getRuntimeLogsDir(vaultPath);
+    public getRuntimeLogsDir(vaultPaths: VaultPaths): string {
+        return this.paths.getRuntimeLogsDir(vaultPaths);
     }
 
-    public async ensureRuntimeLogsDir(vaultPath: string): Promise<string> {
-        const logsDir = this.paths.getRuntimeLogsDir(vaultPath);
+    public async ensureRuntimeLogsDir(vaultPaths: VaultPaths): Promise<string> {
+        const logsDir = this.paths.getRuntimeLogsDir(vaultPaths);
         await mkdir(logsDir, { recursive: true });
         return logsDir;
     }
 
-    public getResolvedRuntimePath(vaultPath: string, settings: GaldurSettings): string {
-        return this.paths.getResolvedRuntimePath(vaultPath, settings);
+    public getResolvedRuntimePath(vaultPaths: VaultPaths, settings: GaldurSettings): string {
+        return this.paths.getResolvedRuntimePath(vaultPaths, settings);
     }
 
     public async getInstallStatus(
-        vaultPath: string,
+        vaultPaths: VaultPaths,
         settings: GaldurSettings,
         pluginVersion: string
     ): Promise<RuntimeInstallStatus> {
-        return await this.status.getInstallStatus(vaultPath, settings, pluginVersion);
+        return await this.status.getInstallStatus(vaultPaths, settings, pluginVersion);
     }
 
     public async installRuntime(
-        vaultPath: string,
+        vaultPaths: VaultPaths,
         pluginVersion: string
     ): Promise<{ runtimePath: string; version: string }> {
-        await this.ensureRuntimeLogsDir(vaultPath);
-        return await this.installer.installRuntime(vaultPath, pluginVersion);
+        await this.ensureRuntimeLogsDir(vaultPaths);
+        return await this.installer.installRuntime(vaultPaths, pluginVersion);
     }
 
-    public async uninstallRuntime(vaultPath: string): Promise<void> {
-        await this.installer.uninstallRuntime(vaultPath);
+    public async uninstallRuntime(vaultPaths: VaultPaths): Promise<void> {
+        await this.installer.uninstallRuntime(vaultPaths);
     }
 
-    public async hasLocalRuntimeSource(vaultPath: string): Promise<boolean> {
-        return await this.installer.hasLocalRuntimeSource(vaultPath);
+    public async hasLocalRuntimeSource(vaultPaths: VaultPaths): Promise<boolean> {
+        return await this.installer.hasLocalRuntimeSource(vaultPaths);
     }
 
     public async installLocalBuiltRuntime(
-        vaultPath: string,
+        vaultPaths: VaultPaths,
         pluginVersion: string
     ): Promise<{ runtimePath: string; version: string }> {
-        await this.ensureRuntimeLogsDir(vaultPath);
-        return await this.installer.installLocalBuiltRuntime(vaultPath, pluginVersion);
+        await this.ensureRuntimeLogsDir(vaultPaths);
+        return await this.installer.installLocalBuiltRuntime(vaultPaths, pluginVersion);
     }
 
     public buildPipePath(): string {

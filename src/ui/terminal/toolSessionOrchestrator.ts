@@ -1,5 +1,5 @@
 import { DEFAULT_TOOL_PROFILE, MIN_TERMINAL_COLS, MIN_TERMINAL_ROWS, STARTUP_TIMEOUT_MS } from '../../constants';
-import { CliTool, GaldurSettings, RuntimeBackend, TerminalExitEvent } from '../../types';
+import { CliTool, GaldurSettings, RuntimeBackend, TerminalExitEvent, VaultPaths } from '../../types';
 import { buildSpawnEnv } from './spawnEnv';
 
 export type PreparedToolLaunch = {
@@ -29,7 +29,7 @@ export type ToolSessionOrchestratorHooks = {
 export type ToolSessionOrchestratorArgs = {
     settings: GaldurSettings;
     tool: CliTool;
-    vaultPath: string;
+    vaultPaths: VaultPaths;
     terminal: { cols: number; rows: number };
     createBackend: () => RuntimeBackend;
     isStale: () => boolean;
@@ -66,7 +66,7 @@ export async function orchestrateToolSessionLaunch(
     }
 
     const profile = args.settings.toolProfiles[args.settings.activeToolId] ?? DEFAULT_TOOL_PROFILE;
-    const debugFilePath = args.tool.getDebugLogPath(args.vaultPath);
+    const debugFilePath = args.tool.getDebugLogPath(args.vaultPaths);
     const launch: PreparedToolLaunch = {
         command: commandResolution.command,
         commandSource: commandResolution.source,
@@ -90,7 +90,7 @@ export async function orchestrateToolSessionLaunch(
     const result = await backend.start({
         command: launch.command,
         args: launch.args,
-        cwd: args.vaultPath,
+        cwd: args.vaultPaths.vaultPath,
         cols,
         rows,
         env: buildSpawnEnv(launch.command),

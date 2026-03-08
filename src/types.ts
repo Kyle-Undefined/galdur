@@ -1,5 +1,11 @@
 export type ToolId = 'claude' | 'codex';
 
+export type VaultPaths = {
+    vaultPath: string;
+    configDir: string;
+    pluginDir: string;
+};
+
 export type CommandResolution = {
     command: string;
     source: string;
@@ -50,7 +56,7 @@ export interface CliTool {
     id: ToolId;
     displayName: string;
     resolveCommand(): Promise<CommandResolution>;
-    getDebugLogPath(vaultPath: string): string;
+    getDebugLogPath(vaultPaths: VaultPaths): string;
     buildArgs(settings: GaldurSettings, debugFilePath?: string): string[];
     getMissingCliHelp(): string;
     getSettingsSpec(): CliToolSettingsSpec;

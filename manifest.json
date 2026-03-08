@@ -1,9 +1,9 @@
 {
     "id": "galdur",
     "name": "Galdur",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "minAppVersion": "1.12.4",
-    "description": "Embed AI CLI tool sessions in an Obsidian sidebar terminal panel.",
+    "description": "Galdur is an Obsidian plugin for running AI CLI tools in a sidebar terminal panel.",
     "author": "Kyle Undefined",
     "authorUrl": "https://github.com/Kyle-Undefined",
     "isDesktopOnly": true

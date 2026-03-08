@@ -5,8 +5,17 @@ import { DEFAULT_SETTINGS, RUNTIME_AUTH_TOKEN_ENV_VAR, RUNTIME_PROTOCOL_VERSION 
 import { createRequest } from '../../src/services/runtime/createRequest';
 import { parseArgs } from '../../runtime/src/args';
 import { Paths } from '../../src/services/runtime/Paths';
+import type { VaultPaths } from '../../src/types';
 
 const testOnWindows = process.platform === 'win32' ? test : test.skip;
+
+function createVaultPaths(): VaultPaths {
+    return {
+        vaultPath: 'C:\\vault',
+        configDir: '.obsidian',
+        pluginDir: 'C:\\vault\\.obsidian\\plugins\\galdur',
+    };
+}
 
 test('createRequest includes the id, auth token, payload, type, and protocol version', () => {
     const request = createRequest('req-1', 'token-123', 'spawn', {
@@ -87,14 +96,11 @@ test('parseArgs falls back to default protocol version and false booleans when o
 
 testOnWindows('Paths builds install, logs, and metadata paths relative to the vault', () => {
     const paths = new Paths();
-    const vaultPath = 'C:\\vault';
+    const vaultPaths = createVaultPaths();
 
-    assert.equal(paths.getRuntimeInstallDir(vaultPath), join(vaultPath, '.obsidian', 'plugins', 'galdur', 'bin'));
-    assert.equal(paths.getRuntimeLogsDir(vaultPath), join(vaultPath, '.obsidian', 'plugins', 'galdur', 'logs'));
-    assert.equal(
-        paths.getVersionMetadataPath(vaultPath),
-        join(vaultPath, '.obsidian', 'plugins', 'galdur', 'bin', 'runtime-version.json')
-    );
+    assert.equal(paths.getRuntimeInstallDir(vaultPaths), join(vaultPaths.pluginDir, 'bin'));
+    assert.equal(paths.getRuntimeLogsDir(vaultPaths), join(vaultPaths.pluginDir, 'logs'));
+    assert.equal(paths.getVersionMetadataPath(vaultPaths), join(vaultPaths.pluginDir, 'bin', 'runtime-version.json'));
 });
 
 testOnWindows('Paths.getResolvedRuntimePath prefers a configured runtime path', () => {
@@ -102,7 +108,7 @@ testOnWindows('Paths.getResolvedRuntimePath prefers a configured runtime path', 
     const settings = structuredClone(DEFAULT_SETTINGS);
     settings.runtimePath = 'C:\\custom\\galdur-runtime.exe';
 
-    assert.equal(paths.getResolvedRuntimePath('C:\\vault', settings), 'C:\\custom\\galdur-runtime.exe');
+    assert.equal(paths.getResolvedRuntimePath(createVaultPaths(), settings), 'C:\\custom\\galdur-runtime.exe');
 });
 
 testOnWindows('Paths runtime asset and bundle names match the current machine target', () => {

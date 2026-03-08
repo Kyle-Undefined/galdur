@@ -1,6 +1,13 @@
 import { join } from 'path';
-import { DEFAULT_TOOL_PROFILE, OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID } from '../constants';
-import { CliTool, CliToolSettingsSpec, CommandResolution, GaldurSettings, ToolPermissionMode } from '../types';
+import { DEFAULT_TOOL_PROFILE } from '../constants';
+import {
+    CliTool,
+    CliToolSettingsSpec,
+    CommandResolution,
+    GaldurSettings,
+    ToolPermissionMode,
+    VaultPaths,
+} from '../types';
 import { resolveExecutable } from '../services/executableResolver';
 import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
@@ -58,8 +65,8 @@ export class CodexTool implements CliTool {
         });
     }
 
-    public getDebugLogPath(vaultPath: string): string {
-        return join(vaultPath, OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID, CODEX_DEBUG_LOG_FILE);
+    public getDebugLogPath(vaultPaths: VaultPaths): string {
+        return join(vaultPaths.pluginDir, CODEX_DEBUG_LOG_FILE);
     }
 
     public buildArgs(settings: GaldurSettings): string[] {

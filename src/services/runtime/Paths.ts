@@ -1,26 +1,26 @@
 import { randomUUID } from 'crypto';
 import { join } from 'path';
-import { OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID, RUNTIME_VERSION_METADATA_FILE } from '../../constants';
-import { GaldurSettings } from '../../types';
+import { RUNTIME_VERSION_METADATA_FILE } from '../../constants';
+import { GaldurSettings, VaultPaths } from '../../types';
 
 export type Platform = 'windows';
 export type Arch = 'x64' | 'arm64';
 
 export class Paths {
-    public getRuntimeInstallDir(vaultPath: string): string {
-        return join(vaultPath, OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID, 'bin');
+    public getRuntimeInstallDir(vaultPaths: VaultPaths): string {
+        return join(vaultPaths.pluginDir, 'bin');
     }
 
-    public getRuntimeLogsDir(vaultPath: string): string {
-        return join(vaultPath, OBSIDIAN_DIR, PLUGINS_DIR, PLUGIN_ID, 'logs');
+    public getRuntimeLogsDir(vaultPaths: VaultPaths): string {
+        return join(vaultPaths.pluginDir, 'logs');
     }
 
-    public getResolvedRuntimePath(vaultPath: string, settings: GaldurSettings): string {
+    public getResolvedRuntimePath(vaultPaths: VaultPaths, settings: GaldurSettings): string {
         const custom = settings.runtimePath?.trim() ?? '';
         if (custom.length > 0) {
             return custom;
         }
-        return join(this.getRuntimeInstallDir(vaultPath), this.getDefaultRuntimeAssetName());
+        return join(this.getRuntimeInstallDir(vaultPaths), this.getDefaultRuntimeAssetName());
     }
 
     public buildPipePath(): string {
@@ -41,8 +41,8 @@ export class Paths {
         return this.getRuntimeAssetName(platform, arch);
     }
 
-    public getVersionMetadataPath(vaultPath: string): string {
-        return join(this.getRuntimeInstallDir(vaultPath), RUNTIME_VERSION_METADATA_FILE);
+    public getVersionMetadataPath(vaultPaths: VaultPaths): string {
+        return join(this.getRuntimeInstallDir(vaultPaths), RUNTIME_VERSION_METADATA_FILE);
     }
 
     public getTarget(): { platform: Platform; arch: Arch } {

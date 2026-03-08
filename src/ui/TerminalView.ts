@@ -13,7 +13,7 @@ import { HostService } from '../services/runtime/HostService';
 import { createBackend } from '../services/runtime/createBackend';
 import { GaldurViewContext, RuntimeBackend } from '../types';
 import { swallowError } from '../utils/logging';
-import { getVaultPath } from '../utils/vault';
+import { getVaultPaths } from '../utils/vault';
 import { getTool } from '../tools/toolRegistry';
 import {
     writeNoOutputMessage,
@@ -157,11 +157,11 @@ export class TerminalView extends ItemView {
 
         const settings = this.context.getSettings();
         const tool = getTool(settings.activeToolId);
-        const vaultPath = getVaultPath(this.app);
+        const vaultPaths = getVaultPaths(this.app);
         const launchResult = await orchestrateToolSessionLaunch({
             settings,
             tool,
-            vaultPath,
+            vaultPaths,
             terminal: { cols: this.terminal.cols, rows: this.terminal.rows },
             createBackend: () => createBackend(this.getRuntimeHost(), settings),
             isStale: () => this.isStartStale(startId),
@@ -185,7 +185,7 @@ export class TerminalView extends ItemView {
                     writeStartupBanner(this.terminal, {
                         command: launch.command,
                         commandSource: launch.commandSource,
-                        vaultPath,
+                        vaultPath: vaultPaths.vaultPath,
                         toolDisplayName: launch.toolDisplayName,
                         debugFilePath: launch.debugFilePath,
                     });
@@ -238,7 +238,7 @@ export class TerminalView extends ItemView {
             this.terminal.writeln('');
             this.terminal.writeln(`[spawn exception] ${String(launchResult.error)}`);
             this.terminal.writeln('');
-            writeRuntimeSetupHint(this.terminal, this.runtimeManager.getResolvedRuntimePath(vaultPath, settings));
+            writeRuntimeSetupHint(this.terminal, this.runtimeManager.getResolvedRuntimePath(vaultPaths, settings));
             return;
         }
 

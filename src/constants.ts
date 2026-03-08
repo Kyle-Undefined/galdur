@@ -15,8 +15,6 @@ export const RUNTIME_ARG_PROTOCOL_VERSION = '--protocol-version';
 export const RUNTIME_ARG_VERSION = '--version';
 export const RUNTIME_ARG_HEALTHCHECK = '--healthcheck';
 
-// Shared path segments
-export const OBSIDIAN_DIR = '.obsidian';
 export const PLUGINS_DIR = 'plugins';
 export const NODE_MODULES_DIR = 'node_modules';
 export const RUNTIME_DIR = 'runtime';

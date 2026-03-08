@@ -14,7 +14,7 @@ import {
     STDERR_BUFFER_LIMIT,
     MAX_CONNECTION_RETRY_BACKOFF_MS,
 } from '../../constants';
-import { GaldurSettings, RuntimeHealthResult } from '../../types';
+import { GaldurSettings, RuntimeHealthResult, VaultPaths } from '../../types';
 import { tokenizeCommandLine } from '../../utils/cliArgs';
 import { commandExistsOnPath } from '../../utils/process';
 import { looksLikePath } from '../../utils/strings';
@@ -39,7 +39,7 @@ export class HostService {
     private disposed = false;
 
     public constructor(
-        private readonly vaultPath: string,
+        private readonly vaultPaths: VaultPaths,
         private readonly runtimeManager: Manager
     ) {
         this.pipePath = this.runtimeManager.buildPipePath();
@@ -207,7 +207,7 @@ export class HostService {
         const configured = settings.runtimePath.trim();
         if (!configured) {
             return {
-                command: this.runtimeManager.getResolvedRuntimePath(this.vaultPath, settings),
+                command: this.runtimeManager.getResolvedRuntimePath(this.vaultPaths, settings),
                 args: [],
             };
         }

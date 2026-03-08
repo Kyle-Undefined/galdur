@@ -3,10 +3,18 @@ import assert from 'node:assert/strict';
 import { DEFAULT_SETTINGS } from '../../src/constants';
 import { ClaudeTool } from '../../src/tools/ClaudeTool';
 import { CodexTool } from '../../src/tools/CodexTool';
-import type { ToolPermissionMode } from '../../src/types';
+import type { ToolPermissionMode, VaultPaths } from '../../src/types';
 
 function cloneSettings() {
     return structuredClone(DEFAULT_SETTINGS);
+}
+
+function createVaultPaths(): VaultPaths {
+    return {
+        vaultPath: 'C:\\vault',
+        configDir: '.obsidian',
+        pluginDir: 'C:\\vault\\.obsidian\\plugins\\galdur',
+    };
 }
 
 test('ClaudeTool.buildArgs returns only extra args when debug logging is off and permission mode is default', () => {
@@ -24,7 +32,7 @@ test('ClaudeTool.buildArgs prepends debug logging args when enabled', () => {
     const settings = cloneSettings();
     settings.toolProfiles.claude.debugLoggingEnabled = true;
 
-    const args = tool.buildArgs(settings, 'C:\\vault\\.obsidian\\plugins\\galdur\\claude-debug.log');
+    const args = tool.buildArgs(settings, tool.getDebugLogPath(createVaultPaths()));
 
     assert.deepEqual(args, ['--debug-file', 'C:\\vault\\.obsidian\\plugins\\galdur\\claude-debug.log']);
 });

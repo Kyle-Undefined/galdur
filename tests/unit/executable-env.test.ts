@@ -28,34 +28,37 @@ function setPathEnv(value: string): () => void {
     };
 }
 
-testOnWindows('resolveExecutable returns an env override when it is a quoted absolute path to an existing file', async () => {
-    const tempDir = await createTempDir();
-    const commandPath = join(tempDir, 'codex.exe');
-    await writeFile(commandPath, '');
-    const original = process.env.GALDUR_TEST_CMD;
-    process.env.GALDUR_TEST_CMD = `"${commandPath}"`;
+testOnWindows(
+    'resolveExecutable returns an env override when it is a quoted absolute path to an existing file',
+    async () => {
+        const tempDir = await createTempDir();
+        const commandPath = join(tempDir, 'codex.exe');
+        await writeFile(commandPath, '');
+        const original = process.env.GALDUR_TEST_CMD;
+        process.env.GALDUR_TEST_CMD = `"${commandPath}"`;
 
-    try {
-        const resolution = await resolveExecutable({
-            overrideEnvVar: 'GALDUR_TEST_CMD',
-            pathCandidates: ['codex.exe'],
-            commonPathCandidates: [],
-            fallbackCommand: 'codex',
-        });
+        try {
+            const resolution = await resolveExecutable({
+                overrideEnvVar: 'GALDUR_TEST_CMD',
+                pathCandidates: ['codex.exe'],
+                commonPathCandidates: [],
+                fallbackCommand: 'codex',
+            });
 
-        assert.equal(resolution.command, commandPath);
-        assert.equal(resolution.source, 'env:GALDUR_TEST_CMD');
-        assert.equal(resolution.found, true);
-        assert.deepEqual(resolution.attempts, [`GALDUR_TEST_CMD=${commandPath}`]);
-    } finally {
-        if (original === undefined) {
-            delete process.env.GALDUR_TEST_CMD;
-        } else {
-            process.env.GALDUR_TEST_CMD = original;
+            assert.equal(resolution.command, commandPath);
+            assert.equal(resolution.source, 'env:GALDUR_TEST_CMD');
+            assert.equal(resolution.found, true);
+            assert.deepEqual(resolution.attempts, [`GALDUR_TEST_CMD=${commandPath}`]);
+        } finally {
+            if (original === undefined) {
+                delete process.env.GALDUR_TEST_CMD;
+            } else {
+                process.env.GALDUR_TEST_CMD = original;
+            }
+            await removeTempDir(tempDir);
         }
-        await removeTempDir(tempDir);
     }
-});
+);
 
 testOnWindows('resolveExecutable returns an env override when it is a non-path command token', async () => {
     const original = process.env.GALDUR_TEST_CMD;

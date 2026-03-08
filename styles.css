@@ -44,3 +44,7 @@
 .galdur-terminal-host .xterm {
     height: 100%;
 }
+
+.galdur-settings-input-full-width {
+    width: 100%;
+}

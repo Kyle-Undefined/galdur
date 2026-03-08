@@ -6,7 +6,7 @@ import { GaldurSettings, ToolId, ToolLaunchProfile, ToolPermissionMode } from '.
 import { TerminalView } from './ui/TerminalView';
 import { SettingTab } from './ui/SettingTab';
 import xtermCssText from '@xterm/xterm/css/xterm.css';
-import { getVaultPath } from './utils/vault';
+import { getVaultPaths } from './utils/vault';
 
 type SanitizedLoadedSettings = Partial<Omit<GaldurSettings, 'toolProfiles'>> & {
     toolProfiles?: Partial<Record<ToolId, Partial<ToolLaunchProfile>>>;
@@ -23,8 +23,8 @@ export default class GaldurPlugin extends Plugin {
     public async onload(): Promise<void> {
         await this.loadSettings();
         this.installXtermCss();
-        const vaultPath = getVaultPath(this.app);
-        this.runtimeHost = new HostService(vaultPath, this.runtimeManager);
+        const vaultPaths = getVaultPaths(this.app);
+        this.runtimeHost = new HostService(vaultPaths, this.runtimeManager);
 
         this.registerView(
             VIEW_TYPE_GALDUR,
@@ -277,8 +277,8 @@ export default class GaldurPlugin extends Plugin {
             throw new Error('Runtime host is paused for maintenance.');
         }
         if (!this.runtimeHost) {
-            const vaultPath = getVaultPath(this.app);
-            this.runtimeHost = new HostService(vaultPath, this.runtimeManager);
+            const vaultPaths = getVaultPaths(this.app);
+            this.runtimeHost = new HostService(vaultPaths, this.runtimeManager);
         }
         return this.runtimeHost;
     }

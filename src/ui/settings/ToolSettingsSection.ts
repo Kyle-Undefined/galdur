@@ -85,7 +85,7 @@ export class ToolSettingsSection {
                         this.deps.saveDebounced();
                     });
                 text.inputEl.rows = TOOL_EXTRA_ARGS_ROWS;
-                text.inputEl.style.width = '100%';
+                text.inputEl.addClass('galdur-settings-input-full-width');
             });
     }
 

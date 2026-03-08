@@ -7,7 +7,7 @@ import {
 } from '../../constants';
 import { Manager } from '../../services/runtime/Manager';
 import { GaldurSettingsStore, RuntimeInstallStatus } from '../../types';
-import { getVaultPath } from '../../utils/vault';
+import { getVaultPaths } from '../../utils/vault';
 import {
     addActionButton,
     buildRuntimeStatusDescription,
@@ -52,7 +52,7 @@ export class RuntimeSettingsSection {
                         this.deps.store.settings.runtimePath = value;
                         this.deps.saveDebounced();
                     });
-                text.inputEl.style.width = '100%';
+                text.inputEl.addClass('galdur-settings-input-full-width');
             });
 
         new Setting(containerEl)
@@ -101,21 +101,21 @@ export class RuntimeSettingsSection {
 
     private async renderRuntimeStatus(statusSetting: Setting, containerEl: HTMLElement): Promise<void> {
         const settings = this.deps.store.settings;
-        const vaultPath = getVaultPath(this.deps.app);
         let status: RuntimeInstallStatus;
         let localDevInstallAvailable = false;
+        const vaultPaths = getVaultPaths(this.deps.app);
         try {
-            localDevInstallAvailable = await this.deps.runtimeManager.hasLocalRuntimeSource(vaultPath);
+            localDevInstallAvailable = await this.deps.runtimeManager.hasLocalRuntimeSource(vaultPaths);
             status = await this.deps.runtimeManager.getInstallStatus(
-                vaultPath,
+                vaultPaths,
                 settings,
                 this.deps.plugin.manifest.version
             );
         } catch (error) {
             status = {
                 state: 'error',
-                runtimePath: this.deps.runtimeManager.getResolvedRuntimePath(vaultPath, settings),
-                installDir: this.deps.runtimeManager.getRuntimeInstallDir(vaultPath),
+                runtimePath: this.deps.runtimeManager.getResolvedRuntimePath(vaultPaths, settings),
+                installDir: this.deps.runtimeManager.getRuntimeInstallDir(vaultPaths),
                 installedVersion: null,
                 targetVersion: this.deps.plugin.manifest.version,
                 isCustomPath: settings.runtimePath.trim().length > 0,
@@ -160,7 +160,7 @@ export class RuntimeSettingsSection {
         }
 
         if (status.state === 'not-installed' || status.state === 'error') {
-            actions.setDesc('Install runtime into .obsidian/plugins/galdur/bin.');
+            actions.setDesc('Install runtime into the vault plugin folder.');
             addActionButton(actions, 'Install runtime', 'install', runAction, {
                 cta: true,
             });
@@ -200,9 +200,9 @@ export class RuntimeSettingsSection {
             })
             .addButton((button) => {
                 button.setButtonText('Open logs folder').onClick(async () => {
-                    const vaultPath = getVaultPath(this.deps.app);
+                    const vaultPaths = getVaultPaths(this.deps.app);
                     try {
-                        const logsDir = await this.deps.runtimeManager.ensureRuntimeLogsDir(vaultPath);
+                        const logsDir = await this.deps.runtimeManager.ensureRuntimeLogsDir(vaultPaths);
                         await this.openPath(logsDir);
                     } catch (error) {
                         new Notice(`Could not create logs folder. Error: ${String(error)}`);
@@ -223,26 +223,26 @@ export class RuntimeSettingsSection {
         this.runtimeBusyAction = action;
         this.deps.refresh();
 
-        const vaultPath = getVaultPath(this.deps.app);
+        const vaultPaths = getVaultPaths(this.deps.app);
         try {
             await this.deps.store.stopRuntimeHostForMaintenance?.();
 
             if (INSTALL_LIKE_RUNTIME_ACTIONS.includes(action)) {
                 const result = await this.deps.runtimeManager.installRuntime(
-                    vaultPath,
+                    vaultPaths,
                     this.deps.plugin.manifest.version
                 );
                 this.deps.store.settings.runtimeVersion = result.version;
             } else if (action === 'installLocalExe') {
                 const result = await this.deps.runtimeManager.installLocalBuiltRuntime(
-                    vaultPath,
+                    vaultPaths,
                     this.deps.plugin.manifest.version
                 );
                 // Set as custom path override so the dev runtime is used instead of the managed release.
                 this.deps.store.settings.runtimePath = result.runtimePath;
                 this.deps.store.settings.runtimeVersion = result.version;
             } else if (action === 'uninstall') {
-                await this.deps.runtimeManager.uninstallRuntime(vaultPath);
+                await this.deps.runtimeManager.uninstallRuntime(vaultPaths);
                 this.deps.store.settings.runtimeVersion = null;
             }
             await this.deps.saveNow();
