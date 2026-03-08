@@ -44,6 +44,6 @@ export function writeNoOutputMessage(terminal: Terminal, startupTimeoutMs: numbe
 
 export function writeRuntimeSetupHint(terminal: Terminal, runtimePath: string): void {
     terminal.writeln('[Runtime setup required]');
-    terminal.writeln("Open Settings -> Galdur and click 'Install runtime', then restart the session.");
+    terminal.writeln("Open Settings -> Galdur and click 'Install runtime', then start the session.");
     terminal.writeln(`Expected runtime path: ${runtimePath}`);
 }

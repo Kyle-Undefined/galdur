@@ -6,12 +6,13 @@ import {
     MIN_TERMINAL_ROWS,
     TERMINAL_DEFAULTS,
     TERMINAL_RESIZE_DEBOUNCE_MS,
+    TOOL_OPTIONS,
     VIEW_TYPE_GALDUR,
 } from '../constants';
 import { Manager } from '../services/runtime/Manager';
 import { HostService } from '../services/runtime/HostService';
 import { createBackend } from '../services/runtime/createBackend';
-import { GaldurViewContext, RuntimeBackend } from '../types';
+import { GaldurViewContext, RuntimeBackend, ToolId } from '../types';
 import { swallowError } from '../utils/logging';
 import { getVaultPaths } from '../utils/vault';
 import { getTool } from '../tools/toolRegistry';
@@ -32,6 +33,9 @@ export class TerminalView extends ItemView {
     private lastSentResize: { cols: number; rows: number } | null = null;
     private terminalDataDisposable: { dispose(): void } | null = null;
     private statusEl: HTMLSpanElement | null = null;
+    private toolSelectEl: HTMLSelectElement | null = null;
+    private startBtnEl: HTMLButtonElement | null = null;
+    private stopBtnEl: HTMLButtonElement | null = null;
     private terminalHostEl: HTMLDivElement | null = null;
     private activeBackend: RuntimeBackend | null = null;
     private startPromise: Promise<void> | null = null;
@@ -78,14 +82,25 @@ export class TerminalView extends ItemView {
         this.disposeTerminal();
     }
 
-    public async restartSession(): Promise<void> {
+    public async startSession(): Promise<void> {
         if (this.isClosed) {
             return;
         }
-        await this.stopSessionInternal('[restarting session]');
-        if (this.isClosed) {
+
+        if (this.activeBackend) {
             return;
         }
+
+        const pendingStart = this.startPromise;
+        if (pendingStart) {
+            await pendingStart.catch(swallowError);
+            if (this.isClosed || this.activeBackend || (this.startPromise !== null && this.startPromise !== pendingStart)) {
+                return;
+            }
+        }
+
+        this.setStatus('Starting...');
+        this.syncControls();
         await this.startToolSessionTracked();
     }
 
@@ -97,26 +112,47 @@ export class TerminalView extends ItemView {
         this.contentEl.empty();
         const shellEl = this.contentEl.createDiv({ cls: 'galdur-terminal-shell' });
         const toolbarEl = shellEl.createDiv({ cls: 'galdur-terminal-toolbar' });
+        const controlsEl = toolbarEl.createDiv({ cls: 'galdur-terminal-toolbar-controls' });
+        const toolSelect = controlsEl.createEl('select', { cls: 'galdur-terminal-select' });
+        for (const toolId of TOOL_OPTIONS) {
+            const tool = getTool(toolId);
+            if (!tool) {
+                continue;
+            }
+            toolSelect.createEl('option', {
+                value: toolId,
+                text: tool.displayName,
+            });
+        }
+        toolSelect.value = this.context.getSettings().activeToolId;
+        toolSelect.addEventListener('change', () => {
+            void this.handleToolSelection(toolSelect.value);
+        });
+        this.toolSelectEl = toolSelect;
+
         this.statusEl = toolbarEl.createSpan({
             cls: 'galdur-terminal-status',
-            text: 'Starting...',
+            text: 'Status: Starting...',
         });
 
-        const restartBtn = toolbarEl.createEl('button', {
+        const actionsEl = toolbarEl.createDiv({ cls: 'galdur-terminal-toolbar-actions' });
+        const startBtn = actionsEl.createEl('button', {
             cls: 'galdur-terminal-btn',
-            text: 'Restart',
+            text: 'Start',
         });
-        restartBtn.addEventListener('click', () => {
-            void this.restartSession();
+        startBtn.addEventListener('click', () => {
+            void this.startSession();
         });
+        this.startBtnEl = startBtn;
 
-        const stopBtn = toolbarEl.createEl('button', {
+        const stopBtn = actionsEl.createEl('button', {
             cls: 'galdur-terminal-btn',
             text: 'Stop',
         });
         stopBtn.addEventListener('click', () => {
             this.stopSession();
         });
+        this.stopBtnEl = stopBtn;
 
         this.terminalHostEl = shellEl.createDiv({ cls: 'galdur-terminal-host' });
 
@@ -147,6 +183,7 @@ export class TerminalView extends ItemView {
             this.scheduleResizeSessionToTerminal();
         });
         this.resizeObserver.observe(this.terminalHostEl);
+        this.syncControls();
     }
 
     private async startToolSession(): Promise<void> {
@@ -206,6 +243,7 @@ export class TerminalView extends ItemView {
                     }
                     this.activeBackend = null;
                     this.setStatus('Stopped');
+                    this.syncControls();
                     this.terminal?.writeln(`[session exited] code=${event.exitCode} signal=${String(event.signal)}`);
                 },
                 onNoOutput: (launch, backend) => {
@@ -278,6 +316,9 @@ export class TerminalView extends ItemView {
         this.resizeObserver = null;
         this.clearResizeTimer();
         this.lastSentResize = null;
+        this.toolSelectEl = null;
+        this.startBtnEl = null;
+        this.stopBtnEl = null;
 
         this.terminalDataDisposable?.dispose();
         this.terminalDataDisposable = null;
@@ -298,6 +339,7 @@ export class TerminalView extends ItemView {
     private async stopSessionInternal(message: string): Promise<void> {
         await this.stopActiveBackend();
         this.setStatus('Stopped');
+        this.syncControls();
         this.terminal?.writeln(`${message}`);
     }
 
@@ -308,9 +350,11 @@ export class TerminalView extends ItemView {
         const backend = this.activeBackend;
         this.activeBackend = null;
         if (!backend) {
+            this.syncControls();
             return;
         }
         await backend.stop().catch(swallowError);
+        this.syncControls();
     }
 
     private clearResizeTimer(): void {
@@ -323,14 +367,49 @@ export class TerminalView extends ItemView {
     private startToolSessionTracked(): Promise<void> {
         const promise = this.startToolSession();
         this.startPromise = promise;
+        this.syncControls();
         return promise.finally(() => {
             if (this.startPromise === promise) {
                 this.startPromise = null;
             }
+            this.syncControls();
         });
     }
 
     private isStartStale(startId: number): boolean {
         return this.isClosed || startId !== this.startGeneration;
+    }
+
+    private async handleToolSelection(value: string): Promise<void> {
+        if (!this.isToolId(value) || this.activeBackend || this.startPromise) {
+            this.syncControls();
+            return;
+        }
+
+        const settings = this.context.getSettings();
+        if (settings.activeToolId === value) {
+            return;
+        }
+
+        settings.activeToolId = value;
+        await this.context.saveSettings();
+    }
+
+    private syncControls(): void {
+        const hasLiveSession = this.activeBackend !== null || this.startPromise !== null;
+        if (this.toolSelectEl) {
+            this.toolSelectEl.value = this.context.getSettings().activeToolId;
+            this.toolSelectEl.disabled = hasLiveSession;
+        }
+        if (this.startBtnEl) {
+            this.startBtnEl.disabled = hasLiveSession;
+        }
+        if (this.stopBtnEl) {
+            this.stopBtnEl.disabled = !hasLiveSession;
+        }
+    }
+
+    private isToolId(value: string): value is ToolId {
+        return TOOL_OPTIONS.includes(value as ToolId);
     }
 }

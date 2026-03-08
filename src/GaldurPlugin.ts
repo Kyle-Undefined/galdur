@@ -55,10 +55,10 @@ export default class GaldurPlugin extends Plugin {
         });
 
         this.addCommand({
-            id: 'restart-galdur-session',
-            name: 'Restart Galdur session',
+            id: 'start-galdur-session',
+            name: 'Start Galdur session',
             callback: () => {
-                void this.restartSession();
+                void this.startSession();
             },
         });
 
@@ -227,7 +227,7 @@ export default class GaldurPlugin extends Plugin {
         await this.app.workspace.revealLeaf(leaf);
     }
 
-    private async restartSession(): Promise<void> {
+    private async startSession(): Promise<void> {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_GALDUR)[0];
         if (!leaf) {
             await this.activateView();
@@ -236,7 +236,7 @@ export default class GaldurPlugin extends Plugin {
 
         const view = leaf.view;
         if (view instanceof TerminalView) {
-            await view.restartSession();
+            await view.startSession();
             await this.app.workspace.revealLeaf(leaf);
         }
     }

@@ -51,8 +51,8 @@ Use this if you do not want to install through BRAT.
 
 1. Open `Settings -> Galdur`.
 2. Install the runtime if it is not already installed.
-3. Pick the active CLI tool.
-4. Make sure the selected CLI is available on `PATH`, or set its command/path override through your environment.
+3. Configure the tool profiles you want to use.
+4. Make sure the CLI you want to launch is available on `PATH`, or set its command/path override through your environment.
 5. Open the Galdur panel from the ribbon icon or the command palette.
 
 ## Supported tools
@@ -62,17 +62,17 @@ Galdur currently supports:
 - Claude
 - Codex
 
-Each tool has its own launch profile. You can change the active tool, permission mode, extra args, and debug logging behavior where supported by that CLI.
+Each tool has its own launch profile. Configure permission mode, extra args, and debug logging behavior in plugin settings, then switch tools from the panel when you want to start a different CLI.
 
 ## What the plugin does
 
 - Opens a sidebar terminal view inside Obsidian
 - Starts CLI sessions with the vault as the working directory
-- Lets you restart or stop the active session from the panel toolbar
-- Supports switching between Claude and Codex from plugin settings
+- Lets you start or stop the active session from the panel toolbar
+- Lets you switch between Claude and Codex from the panel while keeping per-tool settings in plugin settings
 - Manages the local PTY runtime used for terminal sessions
 - Writes tool debug logs for CLIs that support them
-- Exposes commands for toggling the panel, restarting a session, and stopping a session
+- Exposes commands for toggling the panel, starting a session, and stopping a session
 
 ## Runtime, privacy, and safety disclosures
 
@@ -92,7 +92,7 @@ Galdur exists for a different use case: a terminal-first workflow that keeps the
 
 ### Runtime is not installed
 
-If the panel says runtime setup is required, open `Settings -> Galdur` and select `Install runtime`, then restart the session.
+If the panel says runtime setup is required, open `Settings -> Galdur` and select `Install runtime`, then start the session.
 
 ### CLI not found
 
