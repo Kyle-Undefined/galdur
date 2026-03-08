@@ -90,7 +90,7 @@ export class DownloadService {
                     if (outputPath) {
                         void unlink(outputPath).catch((e: NodeJS.ErrnoException) => {
                             if (e.code !== 'ENOENT') {
-                                console.warn('[galdur] Failed to clean up partial download:', e)
+                                console.warn('[galdur] Failed to clean up partial download:', e);
                             }
                         });
                     }

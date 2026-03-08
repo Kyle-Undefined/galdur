@@ -1,5 +1,5 @@
 import { access } from 'fs/promises';
-import { DEFAULT_EXEC_TIMEOUT_MS, EXTRACT_TIMEOUT_MS, RUNTIME_ARG_VERSION } from '../../constants';
+import { EXTRACT_TIMEOUT_MS, RUNTIME_ARG_VERSION, RUNTIME_VERSION_PROBE_TIMEOUT_MS } from '../../constants';
 import { execFileText } from '../../utils/process';
 
 export async function pathExists(path: string): Promise<boolean> {
@@ -11,18 +11,20 @@ export async function pathExists(path: string): Promise<boolean> {
     }
 }
 
-export async function probeRuntimeVersion(runtimePath: string): Promise<string | null> {
-    return probeRuntimeCommandVersion(runtimePath);
+export async function probeRuntimeVersion(
+    runtimePath: string,
+    timeoutMs = RUNTIME_VERSION_PROBE_TIMEOUT_MS
+): Promise<string | null> {
+    return probeRuntimeCommandVersion(runtimePath, [], timeoutMs);
 }
 
 export async function probeRuntimeCommandVersion(
     command: string,
-    args: readonly string[] = []
+    args: readonly string[] = [],
+    timeoutMs = RUNTIME_VERSION_PROBE_TIMEOUT_MS
 ): Promise<string | null> {
     try {
-        const output = await execFileText(command, [...args, RUNTIME_ARG_VERSION], {
-            timeoutMs: DEFAULT_EXEC_TIMEOUT_MS,
-        });
+        const output = await execFileText(command, [...args, RUNTIME_ARG_VERSION], { timeoutMs });
         const version = output.trim();
         return version.length > 0 ? version : null;
     } catch {
