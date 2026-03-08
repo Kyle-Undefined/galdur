@@ -80,11 +80,13 @@ function createVaultPaths(): VaultPaths {
 
 function createTool(
     resolution: CommandResolution,
-    buildArgsImpl?: (debugFilePath?: string) => string[]
+    buildArgsImpl?: (debugFilePath?: string) => string[],
+    spawnEnvOverrides?: NodeJS.ProcessEnv
 ): CliTool & { buildArgCalls: Array<string | undefined> } {
     const buildArgCalls: Array<string | undefined> = [];
     const settingsSpec: CliToolSettingsSpec = {
-        supportedPermissionModes: ['default'],
+        permissionModeLabel: 'Permission mode',
+        permissionModes: [{ value: 'default', label: 'default' }],
         permissionModeDescription: '',
         supportsDebugLogging: true,
         debugLoggingDescription: '',
@@ -105,6 +107,9 @@ function createTool(
         buildArgs(_settings, debugFilePath) {
             buildArgCalls.push(debugFilePath);
             return buildArgsImpl ? buildArgsImpl(debugFilePath) : ['--model', 'sonnet'];
+        },
+        getSpawnEnvOverrides() {
+            return spawnEnvOverrides;
         },
         getMissingCliHelp() {
             return 'Install Claude CLI';
@@ -227,6 +232,51 @@ test('orchestrateToolSessionLaunch prepares and starts a backend with clamped te
         assert.equal(result.launch.debugFilePath, 'C:\\vault\\.obsidian\\plugins\\galdur\\claude-debug.log');
     } finally {
         await removeTempDir(tempDir);
+    }
+});
+
+test('orchestrateToolSessionLaunch merges tool-specific env overrides into the spawned process', async () => {
+    const originalBaseValue = process.env.GALDUR_TEST_BASE;
+    process.env.GALDUR_TEST_BASE = 'base';
+    const tool = createTool(
+        {
+            command: 'opencode.exe',
+            source: 'PATH',
+            attempts: ['where.exe opencode.exe'],
+            found: true,
+        },
+        () => ['--print-logs'],
+        {
+            OPENCODE_PERMISSION: '{"edit":"ask","bash":"ask"}',
+            GALDUR_TEST_BASE: 'override',
+            TERM: 'vt100',
+        }
+    );
+    const { hooks } = createHooks();
+    const backend = createBackend({ ok: true, pid: 77 });
+
+    try {
+        const result = await orchestrateToolSessionLaunch({
+            settings: cloneSettings(),
+            tool,
+            vaultPaths: createVaultPaths(),
+            terminal: { cols: 120, rows: 40 },
+            createBackend: () => backend,
+            isStale: () => false,
+            hooks,
+        });
+
+        assert.equal(result.kind, 'started');
+        assert.equal(backend.startCalls.length, 1);
+        assert.equal(backend.startCalls[0].env.OPENCODE_PERMISSION, '{"edit":"ask","bash":"ask"}');
+        assert.equal(backend.startCalls[0].env.GALDUR_TEST_BASE, 'override');
+        assert.equal(backend.startCalls[0].env.TERM, TERM_ENV_VALUE);
+    } finally {
+        if (originalBaseValue === undefined) {
+            delete process.env.GALDUR_TEST_BASE;
+        } else {
+            process.env.GALDUR_TEST_BASE = originalBaseValue;
+        }
     }
 });
 

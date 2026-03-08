@@ -1,11 +1,14 @@
 import { join } from 'path';
+import { DEFAULT_TOOL_PROFILE, TOOL_ARG_DEBUG_FILE, TOOL_ARG_PERMISSION_MODE } from '../constants';
 import {
-    DEFAULT_TOOL_PROFILE,
-    PERMISSION_MODE_OPTIONS,
-    TOOL_ARG_DEBUG_FILE,
-    TOOL_ARG_PERMISSION_MODE,
-} from '../constants';
-import { CliTool, CliToolSettingsSpec, CommandResolution, GaldurSettings, VaultPaths } from '../types';
+    ClaudePermissionMode,
+    CliTool,
+    CliToolSettingsSpec,
+    CommandResolution,
+    GaldurSettings,
+    ToolPermissionModeOption,
+    VaultPaths,
+} from '../types';
 import { resolveExecutable } from '../services/executableResolver';
 import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
@@ -41,7 +44,16 @@ const CLAUDE_COMMON_PATHS = [
     },
 ] as const;
 
-export class ClaudeTool implements CliTool {
+const CLAUDE_PERMISSION_MODES: readonly ToolPermissionModeOption<ClaudePermissionMode>[] = [
+    { value: 'default', label: 'default' },
+    { value: 'acceptEdits', label: 'acceptEdits' },
+    { value: 'auto', label: 'auto' },
+    { value: 'bypassPermissions', label: 'bypassPermissions' },
+    { value: 'dontAsk', label: 'dontAsk' },
+    { value: 'plan', label: 'plan' },
+] as const;
+
+export class ClaudeTool implements CliTool<'claude'> {
     public readonly id = CLAUDE_TOOL_ID;
     public readonly displayName = CLAUDE_DISPLAY_NAME;
 
@@ -77,9 +89,10 @@ export class ClaudeTool implements CliTool {
         return CLAUDE_MISSING_CLI_HELP;
     }
 
-    public getSettingsSpec(): CliToolSettingsSpec {
+    public getSettingsSpec(): CliToolSettingsSpec<'claude'> {
         return {
-            supportedPermissionModes: PERMISSION_MODE_OPTIONS,
+            permissionModeLabel: 'Permission mode',
+            permissionModes: CLAUDE_PERMISSION_MODES,
             permissionModeDescription: `Passed as ${TOOL_ARG_PERMISSION_MODE} when supported by ${this.displayName}.`,
             supportsDebugLogging: true,
             debugLoggingDescription: 'When enabled, writes tool debug output to a debug log file in the plugin folder.',

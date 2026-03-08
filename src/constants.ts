@@ -1,4 +1,4 @@
-import type { GaldurSettings, ToolId, ToolLaunchProfile, ToolPermissionMode } from './types';
+import type { GaldurSettings, ToolId, ToolLaunchProfile, ToolPermissionModeMap } from './types';
 
 export const VIEW_TYPE_GALDUR = 'galdur-terminal-view';
 export const PLUGIN_ID = 'galdur';
@@ -20,18 +20,9 @@ export const NODE_MODULES_DIR = 'node_modules';
 export const RUNTIME_DIR = 'runtime';
 export const RUNTIME_DIST_DIR = 'dist';
 
-export const TOOL_OPTIONS: ToolId[] = ['claude', 'codex'];
+export const TOOL_OPTIONS: ToolId[] = ['claude', 'codex', 'gemini', 'opencode'];
 export const TOOL_ARG_DEBUG_FILE = '--debug-file';
 export const TOOL_ARG_PERMISSION_MODE = '--permission-mode';
-
-export const PERMISSION_MODE_OPTIONS: ToolPermissionMode[] = [
-    'default',
-    'acceptEdits',
-    'bypassPermissions',
-    'delegate',
-    'dontAsk',
-    'plan',
-];
 
 // Runtime timing
 export const DEFAULT_CONNECT_TIMEOUT_MS = 4000;
@@ -74,21 +65,37 @@ export const HTTP_SUCCESS_MIN = 200;
 export const HTTP_SUCCESS_MAX_EXCLUSIVE = 300;
 export const ALLOWED_DOWNLOAD_HOST_SUFFIXES = ['github.com', 'githubusercontent.com'] as const;
 
-export const DEFAULT_TOOL_PROFILE: ToolLaunchProfile = {
-    permissionMode: 'default',
+const DEFAULT_TOOL_PROFILE_BASE = {
     extraArgs: '',
     debugLoggingEnabled: false,
+} as const;
+
+const DEFAULT_PERMISSION_MODE: { [K in ToolId]: Extract<ToolPermissionModeMap[K], 'default'> } = {
+    claude: 'default',
+    codex: 'default',
+    gemini: 'default',
+    opencode: 'default',
+};
+
+export function createDefaultToolProfile<TToolId extends ToolId>(toolId: TToolId): ToolLaunchProfile<TToolId> {
+    return {
+        permissionMode: DEFAULT_PERMISSION_MODE[toolId],
+        ...DEFAULT_TOOL_PROFILE_BASE,
+    };
+}
+
+export const DEFAULT_TOOL_PROFILE: ToolLaunchProfile = {
+    permissionMode: 'default',
+    ...DEFAULT_TOOL_PROFILE_BASE,
 };
 
 export const DEFAULT_SETTINGS: GaldurSettings = {
     activeToolId: 'claude',
     toolProfiles: {
-        claude: {
-            ...DEFAULT_TOOL_PROFILE,
-        },
-        codex: {
-            ...DEFAULT_TOOL_PROFILE,
-        },
+        claude: createDefaultToolProfile('claude'),
+        codex: createDefaultToolProfile('codex'),
+        gemini: createDefaultToolProfile('gemini'),
+        opencode: createDefaultToolProfile('opencode'),
     },
     runtimePath: '',
     runtimeVersion: null,

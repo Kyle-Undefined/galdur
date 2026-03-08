@@ -46,7 +46,7 @@ This updates:
 
 Galdur uses a managed local runtime process for PTY-backed terminal sessions.
 
-In simple terms: the runtime is a small helper app that exists only to provide real terminal support. It is not an AI model, and it does not bundle Claude or Codex.
+In simple terms: the runtime is a small helper app that exists only to provide real terminal support. It is not an AI model, and it does not bundle Claude, Codex, or OpenCode.
 
 - The Obsidian plugin handles UI, settings, install and update flows, and runtime lifecycle.
 - PTY execution is delegated to a separate Windows runtime binary installed under the vault plugin folder at `bin/`.
@@ -73,6 +73,8 @@ What does not end up inside the runtime bundle:
 
 - Claude Code CLI
 - Codex CLI
+- Gemini CLI
+- OpenCode CLI
 - Any model weights or remote AI service
 
 Build commands:

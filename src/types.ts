@@ -1,4 +1,4 @@
-export type ToolId = 'claude' | 'codex';
+export type ToolId = 'claude' | 'codex' | 'gemini' | 'opencode';
 
 export type VaultPaths = {
     vaultPath: string;
@@ -13,16 +13,52 @@ export type CommandResolution = {
     found: boolean;
 };
 
-export type ToolPermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'delegate' | 'dontAsk' | 'plan';
+export type ClaudePermissionMode = 'default' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk' | 'plan';
 
-export interface ToolLaunchProfile {
-    permissionMode: ToolPermissionMode;
+export type CodexPermissionMode =
+    | 'default'
+    | 'readOnly'
+    | 'workspaceWrite'
+    | 'workspaceWriteNever'
+    | 'fullAuto'
+    | 'dangerFullAccess'
+    | 'bypassApprovalsAndSandbox';
+
+export type GeminiPermissionMode =
+    | 'default'
+    | 'sandbox'
+    | 'autoEdit'
+    | 'sandboxAutoEdit'
+    | 'plan'
+    | 'sandboxPlan'
+    | 'yolo'
+    | 'sandboxYolo';
+
+export type OpenCodePermissionMode = 'default' | 'askOnEditAndBash' | 'readOnly' | 'askAll' | 'allowAll';
+
+export type ToolPermissionModeMap = {
+    claude: ClaudePermissionMode;
+    codex: CodexPermissionMode;
+    gemini: GeminiPermissionMode;
+    opencode: OpenCodePermissionMode;
+};
+
+export type ToolPermissionMode = ToolPermissionModeMap[ToolId];
+
+export interface ToolLaunchProfile<TToolId extends ToolId = ToolId> {
+    permissionMode: ToolPermissionModeMap[TToolId];
     extraArgs: string;
     debugLoggingEnabled: boolean;
 }
 
-export type CliToolSettingsSpec = {
-    supportedPermissionModes: readonly ToolPermissionMode[];
+export type ToolPermissionModeOption<TValue extends string = string> = {
+    value: TValue;
+    label: string;
+};
+
+export type CliToolSettingsSpec<TToolId extends ToolId = ToolId> = {
+    permissionModeLabel: string;
+    permissionModes: readonly ToolPermissionModeOption<ToolPermissionModeMap[TToolId]>[];
     permissionModeDescription: string;
     supportsDebugLogging: boolean;
     debugLoggingDescription: string;
@@ -30,9 +66,11 @@ export type CliToolSettingsSpec = {
     extraArgsPlaceholder: string;
 };
 
+export type ToolProfileRecord = { [K in ToolId]: ToolLaunchProfile<K> };
+
 export interface GaldurSettings {
     activeToolId: ToolId;
-    toolProfiles: Record<ToolId, ToolLaunchProfile>;
+    toolProfiles: ToolProfileRecord;
     runtimePath: string;
     runtimeVersion: string | null;
     runtimeAutoStart: boolean;
@@ -53,14 +91,15 @@ export interface GaldurViewContext {
     openSettings(): void;
 }
 
-export interface CliTool {
-    id: ToolId;
+export interface CliTool<TToolId extends ToolId = ToolId> {
+    id: TToolId;
     displayName: string;
     resolveCommand(): Promise<CommandResolution>;
     getDebugLogPath(vaultPaths: VaultPaths): string;
     buildArgs(settings: GaldurSettings, debugFilePath?: string): string[];
+    getSpawnEnvOverrides?(settings: GaldurSettings): NodeJS.ProcessEnv | undefined;
     getMissingCliHelp(): string;
-    getSettingsSpec(): CliToolSettingsSpec;
+    getSettingsSpec(): CliToolSettingsSpec<TToolId>;
 }
 
 import type { TerminalExitEvent } from '../shared/ipc-types';

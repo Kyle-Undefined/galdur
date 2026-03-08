@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { DEFAULT_SETTINGS } from '../../src/constants';
 import { ClaudeTool } from '../../src/tools/ClaudeTool';
 import { CodexTool } from '../../src/tools/CodexTool';
-import type { ToolPermissionMode, VaultPaths } from '../../src/types';
+import { GeminiTool } from '../../src/tools/GeminiTool';
+import { OpenCodeTool } from '../../src/tools/OpenCodeTool';
+import type { CodexPermissionMode, GeminiPermissionMode, OpenCodePermissionMode, VaultPaths } from '../../src/types';
 
 function cloneSettings() {
     return structuredClone(DEFAULT_SETTINGS);
@@ -68,13 +70,14 @@ test('ClaudeTool.buildArgs appends extra args last so user args can override ear
     ]);
 });
 
-const codexPermissionCases: Array<{ mode: ToolPermissionMode; expected: string[] }> = [
+const codexPermissionCases: Array<{ mode: CodexPermissionMode; expected: string[] }> = [
     { mode: 'default', expected: [] },
-    { mode: 'acceptEdits', expected: ['--full-auto'] },
-    { mode: 'bypassPermissions', expected: ['--dangerously-bypass-approvals-and-sandbox'] },
-    { mode: 'delegate', expected: ['--sandbox', 'danger-full-access', '--ask-for-approval', 'on-request'] },
-    { mode: 'dontAsk', expected: ['--sandbox', 'workspace-write', '--ask-for-approval', 'never'] },
-    { mode: 'plan', expected: ['--sandbox', 'read-only', '--ask-for-approval', 'on-request'] },
+    { mode: 'readOnly', expected: ['--sandbox', 'read-only', '--ask-for-approval', 'on-request'] },
+    { mode: 'workspaceWrite', expected: ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request'] },
+    { mode: 'workspaceWriteNever', expected: ['--sandbox', 'workspace-write', '--ask-for-approval', 'never'] },
+    { mode: 'fullAuto', expected: ['--full-auto'] },
+    { mode: 'dangerFullAccess', expected: ['--sandbox', 'danger-full-access', '--ask-for-approval', 'on-request'] },
+    { mode: 'bypassApprovalsAndSandbox', expected: ['--dangerously-bypass-approvals-and-sandbox'] },
 ];
 
 for (const { mode, expected } of codexPermissionCases) {
@@ -92,7 +95,7 @@ for (const { mode, expected } of codexPermissionCases) {
 test('CodexTool.buildArgs appends extra args after permission-derived flags', () => {
     const tool = new CodexTool();
     const settings = cloneSettings();
-    settings.toolProfiles.codex.permissionMode = 'delegate';
+    settings.toolProfiles.codex.permissionMode = 'dangerFullAccess';
     settings.toolProfiles.codex.extraArgs = '--model gpt-5\n--search';
 
     const args = tool.buildArgs(settings);
@@ -106,4 +109,93 @@ test('CodexTool.buildArgs appends extra args after permission-derived flags', ()
         'gpt-5',
         '--search',
     ]);
+});
+
+const geminiPermissionCases: Array<{ mode: GeminiPermissionMode; expected: string[] }> = [
+    { mode: 'default', expected: [] },
+    { mode: 'sandbox', expected: ['--sandbox'] },
+    { mode: 'autoEdit', expected: ['--approval-mode', 'auto_edit'] },
+    { mode: 'sandboxAutoEdit', expected: ['--sandbox', '--approval-mode', 'auto_edit'] },
+    { mode: 'plan', expected: ['--approval-mode', 'plan'] },
+    { mode: 'sandboxPlan', expected: ['--sandbox', '--approval-mode', 'plan'] },
+    { mode: 'yolo', expected: ['--approval-mode', 'yolo'] },
+    { mode: 'sandboxYolo', expected: ['--sandbox', '--approval-mode', 'yolo'] },
+];
+
+for (const { mode, expected } of geminiPermissionCases) {
+    test(`GeminiTool.buildArgs maps ${mode} permission mode to the expected flags`, () => {
+        const tool = new GeminiTool();
+        const settings = cloneSettings();
+        settings.toolProfiles.gemini.permissionMode = mode;
+
+        const args = tool.buildArgs(settings);
+
+        assert.deepEqual(args, expected);
+    });
+}
+
+test('GeminiTool.buildArgs appends extra args after permission-derived flags', () => {
+    const tool = new GeminiTool();
+    const settings = cloneSettings();
+    settings.toolProfiles.gemini.permissionMode = 'sandboxYolo';
+    settings.toolProfiles.gemini.extraArgs = '--model gemini-2.5-pro\n--debug';
+
+    const args = tool.buildArgs(settings);
+
+    assert.deepEqual(args, ['--sandbox', '--approval-mode', 'yolo', '--model', 'gemini-2.5-pro', '--debug']);
+});
+
+const openCodePermissionCases: Array<{
+    mode: OpenCodePermissionMode;
+    expectedArgs: string[];
+    expectedEnv: NodeJS.ProcessEnv | undefined;
+}> = [
+    { mode: 'default', expectedArgs: [], expectedEnv: undefined },
+    {
+        mode: 'askOnEditAndBash',
+        expectedArgs: [],
+        expectedEnv: { OPENCODE_PERMISSION: '{"edit":"ask","bash":"ask"}' },
+    },
+    {
+        mode: 'readOnly',
+        expectedArgs: [],
+        expectedEnv: { OPENCODE_PERMISSION: '{"edit":"deny","bash":"ask"}' },
+    },
+    {
+        mode: 'askAll',
+        expectedArgs: [],
+        expectedEnv: { OPENCODE_PERMISSION: '{"*":"ask","external_directory":"ask","doom_loop":"ask"}' },
+    },
+    {
+        mode: 'allowAll',
+        expectedArgs: [],
+        expectedEnv: { OPENCODE_PERMISSION: '{"*":"allow","external_directory":"allow","doom_loop":"allow"}' },
+    },
+];
+
+for (const { mode, expectedArgs, expectedEnv } of openCodePermissionCases) {
+    test(`OpenCodeTool maps ${mode} permission mode to the expected env override`, () => {
+        const tool = new OpenCodeTool();
+        const settings = cloneSettings();
+        settings.toolProfiles.opencode.permissionMode = mode;
+
+        const args = tool.buildArgs(settings);
+        const env = tool.getSpawnEnvOverrides(settings);
+
+        assert.deepEqual(args, expectedArgs);
+        assert.deepEqual(env, expectedEnv);
+    });
+}
+
+test('OpenCodeTool.buildArgs appends extra args without duplicating permission flags in argv', () => {
+    const tool = new OpenCodeTool();
+    const settings = cloneSettings();
+    settings.toolProfiles.opencode.permissionMode = 'readOnly';
+    settings.toolProfiles.opencode.extraArgs = '--model anthropic/claude-sonnet-4\n--print-logs';
+
+    const args = tool.buildArgs(settings);
+    const env = tool.getSpawnEnvOverrides(settings);
+
+    assert.deepEqual(args, ['--model', 'anthropic/claude-sonnet-4', '--print-logs']);
+    assert.deepEqual(env, { OPENCODE_PERMISSION: '{"edit":"deny","bash":"ask"}' });
 });

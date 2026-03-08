@@ -28,3 +28,18 @@ export function parseExtraArgs(raw: string): string[] {
     }
     return tokens;
 }
+
+export function formatArgsForDisplay(args: readonly string[]): string {
+    if (args.length === 0) {
+        return '(none)';
+    }
+
+    return args
+        .map((arg) => {
+            if (arg.length === 0 || /[\s"]/.test(arg)) {
+                return JSON.stringify(arg);
+            }
+            return arg;
+        })
+        .join(' ');
+}

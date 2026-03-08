@@ -14,7 +14,7 @@ It embeds terminal-backed AI workflows in a sidebar panel, so you can stay in yo
 
 - Obsidian Desktop
 - Windows x64 or arm64
-- Claude Code CLI and/or Codex CLI installed locally
+- Claude Code CLI, Codex CLI, Gemini CLI, and/or OpenCode CLI installed locally
 - A one-time runtime install from `Settings -> Galdur`
 
 ## What the runtime is
@@ -23,7 +23,7 @@ The runtime is a small local helper app that Galdur downloads and runs on your m
 
 In plain terms, it is the part that gives Galdur access to a real terminal. Obsidian plugins cannot host `node-pty` directly inside the main plugin process, so Galdur uses a separate packaged runtime for that job.
 
-The runtime does not contain Claude, Codex, or any model. It contains Galdur's terminal bridge code plus the `node-pty` dependency needed to start and manage terminal sessions. Galdur talks to that helper app locally, and the helper app launches the CLI tool you selected.
+The runtime does not contain Claude, Codex, OpenCode, or any model. It contains Galdur's terminal bridge code plus the `node-pty` dependency needed to start and manage terminal sessions. Galdur talks to that helper app locally, and the helper app launches the CLI tool you selected.
 
 ## Install the beta with BRAT
 
@@ -61,15 +61,17 @@ Galdur currently supports:
 
 - Claude
 - Codex
+- Gemini
+- OpenCode
 
-Each tool has its own launch profile. Configure permission mode, extra args, and debug logging behavior in plugin settings, then switch tools from the panel when you want to start a different CLI.
+Each tool has its own launch profile. Configure tool-specific permission presets, extra args, and debug logging behavior in plugin settings, then switch tools from the panel when you want to start a different CLI.
 
 ## What the plugin does
 
 - Opens a sidebar terminal view inside Obsidian
 - Starts CLI sessions with the vault as the working directory
 - Lets you start or stop the active session from the panel toolbar
-- Lets you switch between Claude and Codex from the panel while keeping per-tool settings in plugin settings
+- Lets you switch between Claude, Codex, Gemini, and OpenCode from the panel while keeping per-tool settings in plugin settings
 - Manages the local PTY runtime used for terminal sessions
 - Writes tool debug logs for CLIs that support them
 - Exposes commands for toggling the panel, starting a session, and stopping a session
@@ -77,8 +79,8 @@ Each tool has its own launch profile. Configure permission mode, extra args, and
 ## Runtime, privacy, and safety disclosures
 
 - Galdur downloads runtime binaries from GitHub Releases for `Kyle-Undefined/galdur`.
-- Galdur launches a local runtime executable for PTY support. That executable is a packaged helper app containing Galdur's runtime code and `node-pty`; it is not a bundled AI model or bundled Claude/Codex install.
-- The selected CLI tool may read or write outside the vault depending on the CLI itself, the flags you pass, and the permission mode you choose.
+- Galdur launches a local runtime executable for PTY support. That executable is a packaged helper app containing Galdur's runtime code and `node-pty`; it is not a bundled AI model or bundled Claude, Codex, Gemini, or OpenCode install.
+- The selected CLI tool may read or write outside the vault depending on the CLI itself, the flags you pass, and the permission preset or mode you choose.
 - Galdur can access paths outside the vault when launching user-selected CLI tools.
 - No client-side telemetry is included by default.
 
@@ -100,6 +102,8 @@ If Galdur cannot find the AI tool, install the CLI normally and restart Obsidian
 
 - `GALDUR_CLAUDE_CMD`
 - `GALDUR_CODEX_CMD`
+- `GALDUR_GEMINI_CMD`
+- `GALDUR_OPENCODE_CMD`
 
 ### Windows-only support
 

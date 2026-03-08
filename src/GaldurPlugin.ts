@@ -1,16 +1,19 @@
 import { Plugin } from 'obsidian';
-import { DEFAULT_SETTINGS, PERMISSION_MODE_OPTIONS, TOOL_OPTIONS, VIEW_TYPE_GALDUR } from './constants';
+import { createDefaultToolProfile, DEFAULT_SETTINGS, TOOL_OPTIONS, VIEW_TYPE_GALDUR } from './constants';
 import { Manager } from './services/runtime/Manager';
 import { HostService } from './services/runtime/HostService';
-import { GaldurSettings, ToolId, ToolLaunchProfile, ToolPermissionMode } from './types';
+import { GaldurSettings, ToolId, ToolLaunchProfile, ToolProfileRecord } from './types';
+import { getTool } from './tools/toolRegistry';
 import { TerminalView } from './ui/TerminalView';
 import { SettingTab } from './ui/SettingTab';
 import xtermCssText from '@xterm/xterm/css/xterm.css';
 import { getVaultPaths } from './utils/vault';
 
-type SanitizedLoadedSettings = Partial<Omit<GaldurSettings, 'toolProfiles'>> & {
-    toolProfiles?: Partial<Record<ToolId, Partial<ToolLaunchProfile>>>;
+type SanitizedToolProfiles = {
+    [K in ToolId]?: Partial<ToolLaunchProfile<K>>;
 };
+
+type SanitizedLoadedSettings = Partial<Omit<GaldurSettings, 'toolProfiles'>> & { toolProfiles?: SanitizedToolProfiles };
 
 export default class GaldurPlugin extends Plugin {
     private xtermStyleEl: HTMLStyleElement | null = null;
@@ -104,29 +107,31 @@ export default class GaldurPlugin extends Plugin {
 
     private async loadSettings(): Promise<void> {
         const loaded = this.sanitizeLoadedSettings(await this.loadData());
-        const { toolProfiles: loadedProfiles, ...loadedSettings } = loaded;
-
-        // Deep-merge tool profiles so partial saves don't lose defaults
-        const mergedProfiles: Record<ToolId, ToolLaunchProfile> = {
-            ...DEFAULT_SETTINGS.toolProfiles,
-        };
-        if (loadedProfiles) {
-            for (const toolId of TOOL_OPTIONS) {
-                if (!loadedProfiles[toolId]) {
-                    continue;
-                }
-                mergedProfiles[toolId] = {
-                    ...DEFAULT_SETTINGS.toolProfiles[toolId],
-                    ...loadedProfiles[toolId],
-                };
-            }
-        }
 
         this.settings = {
             ...DEFAULT_SETTINGS,
-            ...loadedSettings,
-            toolProfiles: mergedProfiles,
+            ...loaded,
+            toolProfiles: this.mergeToolProfiles(loaded.toolProfiles),
         };
+    }
+
+    private mergeToolProfiles(loadedProfiles?: SanitizedToolProfiles): ToolProfileRecord {
+        const merged = {} as ToolProfileRecord;
+        for (const toolId of TOOL_OPTIONS) {
+            this.setMergedToolProfile(merged, toolId, loadedProfiles?.[toolId]);
+        }
+        return merged;
+    }
+
+    private setMergedToolProfile<TToolId extends ToolId>(
+        profiles: ToolProfileRecord,
+        toolId: TToolId,
+        loadedProfile?: Partial<ToolLaunchProfile<TToolId>>
+    ): void {
+        (profiles as Record<ToolId, ToolLaunchProfile>)[toolId] = {
+            ...createDefaultToolProfile(toolId),
+            ...loadedProfile,
+        } as ToolLaunchProfile<TToolId>;
     }
 
     private sanitizeLoadedSettings(value: unknown): SanitizedLoadedSettings {
@@ -159,44 +164,65 @@ export default class GaldurPlugin extends Plugin {
         return sanitized;
     }
 
-    private sanitizeToolProfiles(value: unknown): Partial<Record<ToolId, Partial<ToolLaunchProfile>>> | undefined {
+    private sanitizeToolProfiles(value: unknown): SanitizedToolProfiles | undefined {
         if (!value || typeof value !== 'object' || Array.isArray(value)) {
             return undefined;
         }
 
         const rawProfiles = value as Record<string, unknown>;
-        const sanitized: Partial<Record<ToolId, Partial<ToolLaunchProfile>>> = {};
+        const sanitized: SanitizedToolProfiles = {};
         for (const toolId of TOOL_OPTIONS) {
-            const rawProfile = rawProfiles[toolId];
-            if (!rawProfile || typeof rawProfile !== 'object' || Array.isArray(rawProfile)) {
+            const profile = this.sanitizeToolProfile(toolId, rawProfiles[toolId]);
+            if (!profile) {
                 continue;
             }
-
-            const rawProfileRecord = rawProfile as Record<string, unknown>;
-            const profile: Partial<ToolLaunchProfile> = {};
-            if (this.isPermissionMode(rawProfileRecord.permissionMode)) {
-                profile.permissionMode = rawProfileRecord.permissionMode;
-            }
-            if (typeof rawProfileRecord.extraArgs === 'string') {
-                profile.extraArgs = rawProfileRecord.extraArgs;
-            }
-            if (typeof rawProfileRecord.debugLoggingEnabled === 'boolean') {
-                profile.debugLoggingEnabled = rawProfileRecord.debugLoggingEnabled;
-            }
-            if (Object.keys(profile).length > 0) {
-                sanitized[toolId] = profile;
-            }
+            (sanitized as Partial<Record<ToolId, Partial<ToolLaunchProfile>>>)[toolId] = profile;
         }
 
         return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+    }
+
+    private sanitizeToolProfile<TToolId extends ToolId>(
+        toolId: TToolId,
+        value: unknown
+    ): Partial<ToolLaunchProfile<TToolId>> | undefined {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return undefined;
+        }
+
+        const rawProfile = value as Record<string, unknown>;
+        const profile: Partial<ToolLaunchProfile<TToolId>> = {};
+        if (this.isPermissionMode(toolId, rawProfile.permissionMode)) {
+            profile.permissionMode = rawProfile.permissionMode;
+        }
+        if (typeof rawProfile.extraArgs === 'string') {
+            profile.extraArgs = rawProfile.extraArgs;
+        }
+        if (typeof rawProfile.debugLoggingEnabled === 'boolean') {
+            profile.debugLoggingEnabled = rawProfile.debugLoggingEnabled;
+        }
+
+        return Object.keys(profile).length > 0 ? profile : undefined;
     }
 
     private isToolId(value: unknown): value is ToolId {
         return typeof value === 'string' && TOOL_OPTIONS.includes(value as ToolId);
     }
 
-    private isPermissionMode(value: unknown): value is ToolPermissionMode {
-        return typeof value === 'string' && PERMISSION_MODE_OPTIONS.includes(value as ToolPermissionMode);
+    private isPermissionMode<TToolId extends ToolId>(
+        toolId: TToolId,
+        value: unknown
+    ): value is ToolLaunchProfile<TToolId>['permissionMode'] {
+        if (typeof value !== 'string') {
+            return false;
+        }
+
+        const tool = getTool(toolId);
+        const permissionModes = tool?.getSettingsSpec()?.permissionModes;
+        if (!permissionModes) {
+            return false;
+        }
+        return permissionModes.some((mode) => mode.value === value);
     }
 
     private async toggleView(): Promise<void> {

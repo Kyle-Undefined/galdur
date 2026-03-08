@@ -87,13 +87,14 @@ export async function orchestrateToolSessionLaunch(
     const cols = Math.max(args.terminal.cols, MIN_TERMINAL_COLS);
     const rows = Math.max(args.terminal.rows, MIN_TERMINAL_ROWS);
 
+    const toolEnvOverrides = args.tool.getSpawnEnvOverrides?.(args.settings);
     const result = await backend.start({
         command: launch.command,
         args: launch.args,
         cwd: args.vaultPaths.vaultPath,
         cols,
         rows,
-        env: buildSpawnEnv(launch.command),
+        env: buildSpawnEnv(launch.command, toolEnvOverrides ? { ...process.env, ...toolEnvOverrides } : process.env),
         startupTimeoutMs: launch.startupTimeoutMs,
         onData: (data) => {
             args.hooks.onData(data, backend);

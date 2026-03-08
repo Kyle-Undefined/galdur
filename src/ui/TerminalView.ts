@@ -253,6 +253,7 @@ export class TerminalView extends ItemView {
                     }
                     writeStartupBanner(this.terminal, {
                         command: launch.command,
+                        args: launch.args,
                         commandSource: launch.commandSource,
                         vaultPath: vaultPaths.vaultPath,
                         toolDisplayName: launch.toolDisplayName,

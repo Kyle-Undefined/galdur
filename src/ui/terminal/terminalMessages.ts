@@ -1,7 +1,9 @@
 import { Terminal } from '@xterm/xterm';
+import { formatArgsForDisplay } from '../../tools/toolHelpers';
 
 export type StartupBannerArgs = {
     command: string;
+    args: string[];
     commandSource: string;
     vaultPath: string;
     toolDisplayName: string;
@@ -23,11 +25,12 @@ export function writeToolMissingMessage(
     }
 }
 
-export function writeStartupBanner(terminal: Terminal, args: StartupBannerArgs): void {
-    terminal.writeln(`Spawning ${args.command} (${args.commandSource}) in ${args.vaultPath}`);
-    terminal.writeln(`Tool: ${args.toolDisplayName}`);
-    if (args.debugFilePath) {
-        terminal.writeln(`Debug log: ${args.debugFilePath}`);
+export function writeStartupBanner(terminal: Terminal, config: StartupBannerArgs): void {
+    terminal.writeln(`Spawning ${config.command} (${config.commandSource}) in ${config.vaultPath}`);
+    terminal.writeln(`Tool: ${config.toolDisplayName}`);
+    terminal.writeln(`Args: ${formatArgsForDisplay(config.args)}`);
+    if (config.debugFilePath) {
+        terminal.writeln(`Debug log: ${config.debugFilePath}`);
     } else {
         terminal.writeln('Debug logging: off');
     }

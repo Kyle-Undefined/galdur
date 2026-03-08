@@ -1,11 +1,12 @@
 import { join } from 'path';
 import { DEFAULT_TOOL_PROFILE } from '../constants';
 import {
+    CodexPermissionMode,
     CliTool,
     CliToolSettingsSpec,
     CommandResolution,
     GaldurSettings,
-    ToolPermissionMode,
+    ToolPermissionModeOption,
     VaultPaths,
 } from '../types';
 import { resolveExecutable } from '../services/executableResolver';
@@ -43,16 +44,27 @@ const CODEX_COMMON_PATHS = [
     },
 ] as const;
 
-const CODEX_PERMISSION_ARGS: Record<ToolPermissionMode, string[]> = {
+const CODEX_PERMISSION_MODES: readonly ToolPermissionModeOption<CodexPermissionMode>[] = [
+    { value: 'default', label: 'CLI default' },
+    { value: 'readOnly', label: 'Read only' },
+    { value: 'workspaceWrite', label: 'Workspace write' },
+    { value: 'workspaceWriteNever', label: 'Workspace write, never ask' },
+    { value: 'fullAuto', label: 'Full auto' },
+    { value: 'dangerFullAccess', label: 'Danger full access' },
+    { value: 'bypassApprovalsAndSandbox', label: 'Bypass approvals and sandbox' },
+] as const;
+
+const CODEX_PERMISSION_ARGS: Record<CodexPermissionMode, string[]> = {
     default: [],
-    acceptEdits: ['--full-auto'],
-    bypassPermissions: ['--dangerously-bypass-approvals-and-sandbox'],
-    delegate: ['--sandbox', 'danger-full-access', '--ask-for-approval', 'on-request'],
-    dontAsk: ['--sandbox', 'workspace-write', '--ask-for-approval', 'never'],
-    plan: ['--sandbox', 'read-only', '--ask-for-approval', 'on-request'],
+    readOnly: ['--sandbox', 'read-only', '--ask-for-approval', 'on-request'],
+    workspaceWrite: ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request'],
+    workspaceWriteNever: ['--sandbox', 'workspace-write', '--ask-for-approval', 'never'],
+    fullAuto: ['--full-auto'],
+    dangerFullAccess: ['--sandbox', 'danger-full-access', '--ask-for-approval', 'on-request'],
+    bypassApprovalsAndSandbox: ['--dangerously-bypass-approvals-and-sandbox'],
 };
 
-export class CodexTool implements CliTool {
+export class CodexTool implements CliTool<'codex'> {
     public readonly id = CODEX_TOOL_ID;
     public readonly displayName = CODEX_DISPLAY_NAME;
 
@@ -71,18 +83,20 @@ export class CodexTool implements CliTool {
 
     public buildArgs(settings: GaldurSettings): string[] {
         const profile = settings.toolProfiles[this.id] ?? DEFAULT_TOOL_PROFILE;
-        return [...CODEX_PERMISSION_ARGS[profile.permissionMode], ...parseExtraArgs(profile.extraArgs)];
+        const permissionArgs = CODEX_PERMISSION_ARGS[profile.permissionMode] ?? CODEX_PERMISSION_ARGS.default;
+        return [...permissionArgs, ...parseExtraArgs(profile.extraArgs)];
     }
 
     public getMissingCliHelp(): string {
         return CODEX_MISSING_CLI_HELP;
     }
 
-    public getSettingsSpec(): CliToolSettingsSpec {
+    public getSettingsSpec(): CliToolSettingsSpec<'codex'> {
         return {
-            supportedPermissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'delegate', 'dontAsk', 'plan'],
+            permissionModeLabel: 'Permission preset',
+            permissionModes: CODEX_PERMISSION_MODES,
             permissionModeDescription:
-                'Translated to Codex sandbox and approval flags before any extra args are appended.',
+                'Uses Codex-native sandbox and approval presets before any extra args are appended.',
             supportsDebugLogging: false,
             debugLoggingDescription:
                 'Codex does not expose a dedicated debug log file flag. Use Tool extra args for CLI-specific diagnostics.',
