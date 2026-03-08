@@ -155,8 +155,14 @@ Plugin release artifacts:
 - `main.js`
 - `manifest.json`
 - `versions.json`
-- `styles.css` when present
+- `styles.css`
 - `galdur-<version>.zip`
+
+Release tag contract:
+
+- Git tags must match `manifest.json` exactly, such as `1.0.1`
+- The managed runtime installer downloads from the matching GitHub release tag
+- BRAT-compatible release assets are `main.js`, `manifest.json`, `styles.css`, and `versions.json`
 
 ## Local runtime dev install flow
 

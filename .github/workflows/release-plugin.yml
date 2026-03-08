@@ -3,7 +3,7 @@ name: Release
 on:
     push:
         tags:
-            - 'v*'
+            - '*'
 
 permissions:
     contents: write
@@ -40,6 +40,22 @@ jobs:
                   TAG_SHA="${GITHUB_SHA}"
                   if ! git merge-base --is-ancestor "${TAG_SHA}" "origin/master"; then
                     echo "Tag ${GITHUB_REF_NAME} is not on origin/master."
+                    exit 1
+                  fi
+
+            - name: Ensure tag matches manifest version
+              run: |
+                  TAG_NAME="${GITHUB_REF_NAME}"
+                  MANIFEST_VERSION="$(node -p "require('./manifest.json').version")"
+                  PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+
+                  if [ "${TAG_NAME}" != "${MANIFEST_VERSION}" ]; then
+                    echo "Tag ${TAG_NAME} does not match manifest.json version ${MANIFEST_VERSION}."
+                    exit 1
+                  fi
+
+                  if [ "${PACKAGE_VERSION}" != "${MANIFEST_VERSION}" ]; then
+                    echo "package.json version ${PACKAGE_VERSION} does not match manifest.json version ${MANIFEST_VERSION}."
                     exit 1
                   fi
 
@@ -82,7 +98,7 @@ jobs:
 
             - name: Verify required release files
               run: |
-                  for file in main.js manifest.json versions.json; do
+                  for file in main.js manifest.json versions.json styles.css; do
                     if [ ! -f "$file" ]; then
                       echo "Required file $file is missing"
                       exit 1
@@ -92,12 +108,8 @@ jobs:
             - name: Package plugin assets
               run: |
                   VERSION="${GITHUB_REF_NAME}"
-                  VERSION="${VERSION#v}"
                   mkdir -p dist/release
-                  cp main.js manifest.json versions.json dist/release/
-                  if [ -f styles.css ]; then
-                      cp styles.css dist/release/
-                  fi
+                  cp main.js manifest.json versions.json styles.css dist/release/
                   cd dist/release
                   zip -r "../galdur-${VERSION}.zip" .
 
@@ -110,6 +122,7 @@ jobs:
                   files: |
                       main.js
                       manifest.json
+                      styles.css
                       versions.json
                       dist/galdur-*.zip
 

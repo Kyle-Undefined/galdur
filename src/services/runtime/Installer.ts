@@ -34,9 +34,8 @@ export class Installer {
 
         await mkdir(installParentDir, { recursive: true });
 
-        const releaseTag = this.toReleaseTag(pluginVersion);
-        const checksumsUrl = `${RUNTIME_RELEASE_BASE_URL}/${releaseTag}/${RUNTIME_CHECKSUM_FILE}`;
-        const runtimeUrl = `${RUNTIME_RELEASE_BASE_URL}/${releaseTag}/${runtimeBundle}`;
+        const checksumsUrl = `${RUNTIME_RELEASE_BASE_URL}/${pluginVersion}/${RUNTIME_CHECKSUM_FILE}`;
+        const runtimeUrl = `${RUNTIME_RELEASE_BASE_URL}/${pluginVersion}/${runtimeBundle}`;
 
         try {
             const checksums = await this.downloadService.downloadText(checksumsUrl);
@@ -117,11 +116,6 @@ export class Installer {
                 `Local runtime version mismatch. Expected ${pluginVersion}, got ${runtimeVersion ?? 'unknown'}. Rebuild runtime/dist from this repo version before installing.`,
         });
     }
-
-    private toReleaseTag(version: string): string {
-        return version.startsWith('v') ? version : `v${version}`;
-    }
-
     private async resolveLocalBuiltRuntimeBundle(
         vaultPaths: VaultPaths
     ): Promise<{ bundlePath: string; runtimeAsset: string }> {

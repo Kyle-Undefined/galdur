@@ -49,6 +49,8 @@ Use this if you do not want to install through BRAT.
 4. Open `Settings -> Galdur`.
 5. In the `Runtime` section, select `Install runtime`.
 
+Release tags match `manifest.json` exactly, such as `1.0.1`.
+
 ## Quick start
 
 1. Open `Settings -> Galdur`.
