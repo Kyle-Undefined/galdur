@@ -12,8 +12,15 @@ export async function pathExists(path: string): Promise<boolean> {
 }
 
 export async function probeRuntimeVersion(runtimePath: string): Promise<string | null> {
+    return probeRuntimeCommandVersion(runtimePath);
+}
+
+export async function probeRuntimeCommandVersion(
+    command: string,
+    args: readonly string[] = []
+): Promise<string | null> {
     try {
-        const output = await execFileText(runtimePath, [RUNTIME_ARG_VERSION], {
+        const output = await execFileText(command, [...args, RUNTIME_ARG_VERSION], {
             timeoutMs: DEFAULT_EXEC_TIMEOUT_MS,
         });
         const version = output.trim();

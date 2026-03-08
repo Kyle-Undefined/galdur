@@ -2,7 +2,7 @@ import { GaldurSettings, RuntimeInstallStatus, VaultPaths } from '../../types';
 import { tokenizeCommandLine } from '../../utils/cliArgs';
 import { looksLikePath } from '../../utils/strings';
 import { commandExistsOnPath } from '../../utils/process';
-import { pathExists, probeRuntimeVersion } from './fileSystem';
+import { pathExists, probeRuntimeCommandVersion, probeRuntimeVersion } from './fileSystem';
 import { MetadataStore } from './MetadataStore';
 import { Paths } from './Paths';
 
@@ -146,11 +146,36 @@ export class StatusService {
             }
         }
 
+        const installedVersion = await probeRuntimeCommandVersion(command, tokens.slice(1));
+        if (!installedVersion) {
+            return {
+                state: 'error',
+                runtimePath,
+                installDir,
+                installedVersion: configuredVersion,
+                targetVersion,
+                isCustomPath: true,
+                message: `Custom runtime command is reachable but did not return a valid Galdur version for --version: ${runtimePath}`,
+            };
+        }
+
+        if (installedVersion !== targetVersion) {
+            return {
+                state: 'outdated',
+                runtimePath,
+                installDir,
+                installedVersion,
+                targetVersion,
+                isCustomPath: true,
+                message: `Custom runtime version ${installedVersion} is different from plugin version ${targetVersion}.`,
+            };
+        }
+
         return {
             state: 'installed',
             runtimePath,
             installDir,
-            installedVersion: configuredVersion,
+            installedVersion,
             targetVersion,
             isCustomPath: true,
             message: 'Using custom runtime command override.',

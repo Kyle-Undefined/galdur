@@ -38,7 +38,7 @@ export const ERROR_NOTICE_DURATION_MS = 10000;
 export const MAX_CONNECTION_RETRY_BACKOFF_MS = 1000;
 export const DEFAULT_EXEC_TIMEOUT_MS = 1500;
 export const SETTINGS_SAVE_DEBOUNCE_MS = 400;
-export const TERMINAL_RESIZE_DEBOUNCE_MS = 75;
+export const TERMINAL_RESIZE_DEBOUNCE_MS = 150;
 export const TOOL_EXTRA_ARGS_ROWS = 4;
 
 // Terminal defaults
@@ -97,6 +97,7 @@ export const DEFAULT_SETTINGS: GaldurSettings = {
         gemini: createDefaultToolProfile('gemini'),
         opencode: createDefaultToolProfile('opencode'),
     },
+    excludedNoteTags: [],
     runtimePath: '',
     runtimeVersion: null,
     runtimeAutoStart: true,

@@ -1,6 +1,6 @@
 import { Setting } from 'obsidian';
 import { createDefaultToolProfile, TOOL_EXTRA_ARGS_ROWS, TOOL_OPTIONS } from '../../constants';
-import { getTool } from '../../tools/toolRegistry';
+import { requireTool } from '../../tools/toolRegistry';
 import { GaldurSettingsStore, ToolId, ToolLaunchProfile, ToolPermissionMode } from '../../types';
 
 type ToolSettingsSectionDeps = {
@@ -14,7 +14,7 @@ export class ToolSettingsSection {
     public constructor(private readonly deps: ToolSettingsSectionDeps) {}
 
     public render(containerEl: HTMLElement): void {
-        const activeTool = getTool(this.deps.store.settings.activeToolId);
+        const activeTool = requireTool(this.deps.store.settings.activeToolId);
         const settingsSpec = activeTool.getSettingsSpec();
 
         new Setting(containerEl)
@@ -22,7 +22,7 @@ export class ToolSettingsSection {
             .setDesc('Tool opened in the Galdur terminal panel.')
             .addDropdown((dropdown) => {
                 for (const toolId of TOOL_OPTIONS) {
-                    const tool = getTool(toolId);
+                    const tool = requireTool(toolId);
                     dropdown.addOption(toolId, tool.displayName);
                 }
                 dropdown.setValue(this.deps.store.settings.activeToolId).onChange(async (value) => {
@@ -111,7 +111,7 @@ export class ToolSettingsSection {
     }
 
     private isActiveToolPermissionMode(value: string): value is ToolPermissionMode {
-        const tool = getTool(this.deps.store.settings.activeToolId);
+        const tool = requireTool(this.deps.store.settings.activeToolId);
         return tool.getSettingsSpec().permissionModes.some((mode) => mode.value === value);
     }
 

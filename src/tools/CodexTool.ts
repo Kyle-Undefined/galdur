@@ -1,4 +1,3 @@
-import { join } from 'path';
 import { DEFAULT_TOOL_PROFILE } from '../constants';
 import {
     CodexPermissionMode,
@@ -10,6 +9,7 @@ import {
     VaultPaths,
 } from '../types';
 import { resolveExecutable } from '../services/executableResolver';
+import { getToolLogPath } from './toolLogPath';
 import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const CODEX_TOOL_ID = 'codex';
@@ -78,7 +78,7 @@ export class CodexTool implements CliTool<'codex'> {
     }
 
     public getDebugLogPath(vaultPaths: VaultPaths): string {
-        return join(vaultPaths.pluginDir, CODEX_DEBUG_LOG_FILE);
+        return getToolLogPath(vaultPaths, CODEX_DEBUG_LOG_FILE);
     }
 
     public buildArgs(settings: GaldurSettings): string[] {

@@ -110,6 +110,7 @@ export class Backend implements RuntimeBackendContract {
             activeSessionId = response.sessionId;
             if (droppedEventCount > 0) {
                 console.warn(`[galdur] Dropped ${droppedEventCount} early session events (buffer overflow)`);
+                options.onData(`\r\n[galdur] Warning: ${droppedEventCount} early output events were dropped\r\n`);
             }
             const buffered = pendingSessionEvents.slice();
             pendingSessionEvents.length = 0;

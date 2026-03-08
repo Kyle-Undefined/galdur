@@ -1,5 +1,14 @@
+import { mkdir } from 'fs/promises';
+import { dirname } from 'path';
 import { DEFAULT_TOOL_PROFILE, MIN_TERMINAL_COLS, MIN_TERMINAL_ROWS, STARTUP_TIMEOUT_MS } from '../../constants';
-import { CliTool, GaldurSettings, RuntimeBackend, TerminalExitEvent, VaultPaths } from '../../types';
+import {
+    CliTool,
+    GaldurSettings,
+    ResolvedContextGuard,
+    RuntimeBackend,
+    TerminalExitEvent,
+    VaultPaths,
+} from '../../types';
 import { buildSpawnEnv } from './spawnEnv';
 
 export type PreparedToolLaunch = {
@@ -7,8 +16,10 @@ export type PreparedToolLaunch = {
     commandSource: string;
     args: string[];
     toolDisplayName: string;
+    debugLoggingEnabled: boolean;
     debugFilePath?: string;
     startupTimeoutMs: number;
+    contextGuard: ResolvedContextGuard;
 };
 
 export type MissingToolCommand = {
@@ -33,6 +44,7 @@ export type ToolSessionOrchestratorArgs = {
     terminal: { cols: number; rows: number };
     createBackend: () => RuntimeBackend;
     isStale: () => boolean;
+    contextGuard?: ResolvedContextGuard;
     startupTimeoutMs?: number;
     hooks: ToolSessionOrchestratorHooks;
 };
@@ -67,14 +79,30 @@ export async function orchestrateToolSessionLaunch(
 
     const profile = args.settings.toolProfiles[args.settings.activeToolId] ?? DEFAULT_TOOL_PROFILE;
     const debugFilePath = args.tool.getDebugLogPath(args.vaultPaths);
+    const contextGuard = args.contextGuard ?? {
+        excludedTags: [],
+        excludedNotePaths: [],
+        toolArgs: [],
+        supportLevel: 'none',
+        supportMessage: 'Global tag guard is off.',
+    };
     const launch: PreparedToolLaunch = {
         command: commandResolution.command,
         commandSource: commandResolution.source,
-        args: args.tool.buildArgs(args.settings, profile.debugLoggingEnabled ? debugFilePath : undefined),
+        args: [
+            ...args.tool.buildArgs(args.settings, profile.debugLoggingEnabled ? debugFilePath : undefined),
+            ...contextGuard.toolArgs,
+        ],
         toolDisplayName: args.tool.displayName,
+        debugLoggingEnabled: profile.debugLoggingEnabled,
         debugFilePath: profile.debugLoggingEnabled ? debugFilePath : undefined,
         startupTimeoutMs: args.startupTimeoutMs ?? STARTUP_TIMEOUT_MS,
+        contextGuard,
     };
+
+    if (profile.debugLoggingEnabled && debugFilePath) {
+        await mkdir(dirname(debugFilePath), { recursive: true });
+    }
 
     args.hooks.onPrepared(launch);
     if (args.isStale()) {

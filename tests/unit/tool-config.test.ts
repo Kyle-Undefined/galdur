@@ -36,7 +36,7 @@ test('ClaudeTool.buildArgs prepends debug logging args when enabled', () => {
 
     const args = tool.buildArgs(settings, tool.getDebugLogPath(createVaultPaths()));
 
-    assert.deepEqual(args, ['--debug-file', 'C:\\vault\\.obsidian\\plugins\\galdur\\claude-debug.log']);
+    assert.deepEqual(args, ['--debug-file', 'C:\\vault\\.obsidian\\plugins\\galdur\\logs\\claude-debug.log']);
 });
 
 test('ClaudeTool.buildArgs includes permission mode only when it is non-default', () => {

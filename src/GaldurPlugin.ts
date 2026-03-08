@@ -1,19 +1,13 @@
 import { Plugin } from 'obsidian';
-import { createDefaultToolProfile, DEFAULT_SETTINGS, TOOL_OPTIONS, VIEW_TYPE_GALDUR } from './constants';
+import { DEFAULT_SETTINGS, VIEW_TYPE_GALDUR } from './constants';
+import { mergeToolProfiles, sanitizeLoadedSettings } from './settings/settingsHelpers';
 import { Manager } from './services/runtime/Manager';
 import { HostService } from './services/runtime/HostService';
-import { GaldurSettings, ToolId, ToolLaunchProfile, ToolProfileRecord } from './types';
-import { getTool } from './tools/toolRegistry';
+import { GaldurSettings } from './types';
 import { TerminalView } from './ui/TerminalView';
 import { SettingTab } from './ui/SettingTab';
 import xtermCssText from '@xterm/xterm/css/xterm.css';
 import { getVaultPaths } from './utils/vault';
-
-type SanitizedToolProfiles = {
-    [K in ToolId]?: Partial<ToolLaunchProfile<K>>;
-};
-
-type SanitizedLoadedSettings = Partial<Omit<GaldurSettings, 'toolProfiles'>> & { toolProfiles?: SanitizedToolProfiles };
 
 export default class GaldurPlugin extends Plugin {
     private xtermStyleEl: HTMLStyleElement | null = null;
@@ -97,7 +91,6 @@ export default class GaldurPlugin extends Plugin {
         this.runtimeHost = null;
     }
 
-    // Clears maintenance mode so getRuntimeHost() can lazily recreate the host on next use.
     public startRuntimeHostAfterMaintenance(): void {
         if (this.disposed) {
             return;
@@ -106,123 +99,13 @@ export default class GaldurPlugin extends Plugin {
     }
 
     private async loadSettings(): Promise<void> {
-        const loaded = this.sanitizeLoadedSettings(await this.loadData());
+        const loaded = sanitizeLoadedSettings(await this.loadData());
 
         this.settings = {
             ...DEFAULT_SETTINGS,
             ...loaded,
-            toolProfiles: this.mergeToolProfiles(loaded.toolProfiles),
+            toolProfiles: mergeToolProfiles(loaded.toolProfiles),
         };
-    }
-
-    private mergeToolProfiles(loadedProfiles?: SanitizedToolProfiles): ToolProfileRecord {
-        const merged = {} as ToolProfileRecord;
-        for (const toolId of TOOL_OPTIONS) {
-            this.setMergedToolProfile(merged, toolId, loadedProfiles?.[toolId]);
-        }
-        return merged;
-    }
-
-    private setMergedToolProfile<TToolId extends ToolId>(
-        profiles: ToolProfileRecord,
-        toolId: TToolId,
-        loadedProfile?: Partial<ToolLaunchProfile<TToolId>>
-    ): void {
-        (profiles as Record<ToolId, ToolLaunchProfile>)[toolId] = {
-            ...createDefaultToolProfile(toolId),
-            ...loadedProfile,
-        } as ToolLaunchProfile<TToolId>;
-    }
-
-    private sanitizeLoadedSettings(value: unknown): SanitizedLoadedSettings {
-        if (!value || typeof value !== 'object' || Array.isArray(value)) {
-            return {};
-        }
-
-        const record = value as Record<string, unknown>;
-        const sanitized: SanitizedLoadedSettings = {};
-        if (this.isToolId(record.activeToolId)) {
-            sanitized.activeToolId = record.activeToolId;
-        }
-        if (typeof record.runtimePath === 'string') {
-            sanitized.runtimePath = record.runtimePath;
-        }
-        if (typeof record.runtimeVersion === 'string' || record.runtimeVersion === null) {
-            sanitized.runtimeVersion = record.runtimeVersion;
-        }
-        if (typeof record.runtimeAutoStart === 'boolean') {
-            sanitized.runtimeAutoStart = record.runtimeAutoStart;
-        }
-        if (typeof record.runtimeConnectTimeoutMs === 'number' && Number.isFinite(record.runtimeConnectTimeoutMs)) {
-            sanitized.runtimeConnectTimeoutMs = Math.trunc(record.runtimeConnectTimeoutMs);
-        }
-
-        const toolProfiles = this.sanitizeToolProfiles(record.toolProfiles);
-        if (toolProfiles) {
-            sanitized.toolProfiles = toolProfiles;
-        }
-        return sanitized;
-    }
-
-    private sanitizeToolProfiles(value: unknown): SanitizedToolProfiles | undefined {
-        if (!value || typeof value !== 'object' || Array.isArray(value)) {
-            return undefined;
-        }
-
-        const rawProfiles = value as Record<string, unknown>;
-        const sanitized: SanitizedToolProfiles = {};
-        for (const toolId of TOOL_OPTIONS) {
-            const profile = this.sanitizeToolProfile(toolId, rawProfiles[toolId]);
-            if (!profile) {
-                continue;
-            }
-            (sanitized as Partial<Record<ToolId, Partial<ToolLaunchProfile>>>)[toolId] = profile;
-        }
-
-        return Object.keys(sanitized).length > 0 ? sanitized : undefined;
-    }
-
-    private sanitizeToolProfile<TToolId extends ToolId>(
-        toolId: TToolId,
-        value: unknown
-    ): Partial<ToolLaunchProfile<TToolId>> | undefined {
-        if (!value || typeof value !== 'object' || Array.isArray(value)) {
-            return undefined;
-        }
-
-        const rawProfile = value as Record<string, unknown>;
-        const profile: Partial<ToolLaunchProfile<TToolId>> = {};
-        if (this.isPermissionMode(toolId, rawProfile.permissionMode)) {
-            profile.permissionMode = rawProfile.permissionMode;
-        }
-        if (typeof rawProfile.extraArgs === 'string') {
-            profile.extraArgs = rawProfile.extraArgs;
-        }
-        if (typeof rawProfile.debugLoggingEnabled === 'boolean') {
-            profile.debugLoggingEnabled = rawProfile.debugLoggingEnabled;
-        }
-
-        return Object.keys(profile).length > 0 ? profile : undefined;
-    }
-
-    private isToolId(value: unknown): value is ToolId {
-        return typeof value === 'string' && TOOL_OPTIONS.includes(value as ToolId);
-    }
-
-    private isPermissionMode<TToolId extends ToolId>(
-        toolId: TToolId,
-        value: unknown
-    ): value is ToolLaunchProfile<TToolId>['permissionMode'] {
-        if (typeof value !== 'string') {
-            return false;
-        }
-
-        const tool = getTool(toolId);
-        const permissionModes = tool?.getSettingsSpec()?.permissionModes;
-        if (!permissionModes) {
-            return false;
-        }
-        return permissionModes.some((mode) => mode.value === value);
     }
 
     private async toggleView(): Promise<void> {

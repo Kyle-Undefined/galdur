@@ -102,7 +102,7 @@ function createTool(
             return resolution;
         },
         getDebugLogPath(vaultPaths: VaultPaths) {
-            return join(vaultPaths.pluginDir, 'claude-debug.log');
+            return join(vaultPaths.pluginDir, 'logs', 'claude-debug.log');
         },
         buildArgs(_settings, debugFilePath) {
             buildArgCalls.push(debugFilePath);
@@ -216,7 +216,7 @@ test('orchestrateToolSessionLaunch prepares and starts a backend with clamped te
         assert.equal(result.pid, 4321);
         assert.equal(state.prepared.length, 1);
         assert.equal(state.backends[0], backend);
-        assert.deepEqual(tool.buildArgCalls, ['C:\\vault\\.obsidian\\plugins\\galdur\\claude-debug.log']);
+        assert.deepEqual(tool.buildArgCalls, ['C:\\vault\\.obsidian\\plugins\\galdur\\logs\\claude-debug.log']);
         assert.equal(backend.startCalls.length, 1);
         assert.deepEqual(backend.startCalls[0].args, ['--model', 'sonnet']);
         assert.equal(backend.startCalls[0].cwd, 'C:\\vault');
@@ -229,10 +229,51 @@ test('orchestrateToolSessionLaunch prepares and starts a backend with clamped te
             new RegExp(`^${escapeRegExp(tempDir)};`)
         );
         assert.equal(result.launch.commandSource, 'PATH');
-        assert.equal(result.launch.debugFilePath, 'C:\\vault\\.obsidian\\plugins\\galdur\\claude-debug.log');
+        assert.equal(result.launch.debugFilePath, 'C:\\vault\\.obsidian\\plugins\\galdur\\logs\\claude-debug.log');
+        assert.equal(result.launch.contextGuard.supportLevel, 'none');
     } finally {
         await removeTempDir(tempDir);
     }
+});
+
+test('orchestrateToolSessionLaunch appends context guard args after tool args', async () => {
+    const tool = createTool({
+        command: 'claude.exe',
+        source: 'PATH',
+        attempts: ['where.exe claude.exe'],
+        found: true,
+    });
+    const { hooks } = createHooks();
+    const backend = createBackend({ ok: true, pid: 101 });
+
+    const result = await orchestrateToolSessionLaunch({
+        settings: cloneSettings(),
+        tool,
+        vaultPaths: createVaultPaths(),
+        contextGuard: {
+            excludedTags: ['private'],
+            excludedNotePaths: ['notes/private.md'],
+            toolArgs: ['--settings', 'C:\\vault\\.obsidian\\plugins\\galdur\\context-guard\\claude-settings.json'],
+            supportLevel: 'enforced',
+            supportMessage: '1 tagged note hidden via generated Claude permissions.',
+        },
+        terminal: { cols: 120, rows: 40 },
+        createBackend: () => backend,
+        isStale: () => false,
+        hooks,
+    });
+
+    assert.equal(result.kind, 'started');
+    if (result.kind !== 'started') {
+        return;
+    }
+    assert.deepEqual(backend.startCalls[0].args, [
+        '--model',
+        'sonnet',
+        '--settings',
+        'C:\\vault\\.obsidian\\plugins\\galdur\\context-guard\\claude-settings.json',
+    ]);
+    assert.equal(result.launch.contextGuard.supportLevel, 'enforced');
 });
 
 test('orchestrateToolSessionLaunch merges tool-specific env overrides into the spawned process', async () => {

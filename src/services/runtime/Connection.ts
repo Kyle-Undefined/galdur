@@ -202,6 +202,7 @@ export class Connection {
         try {
             raw = JSON.parse(line);
         } catch {
+            console.warn('[galdur] Failed to parse IPC message:', line.slice(0, 200));
             return;
         }
 

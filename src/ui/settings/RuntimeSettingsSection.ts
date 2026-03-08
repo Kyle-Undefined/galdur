@@ -6,6 +6,7 @@ import {
     RUNTIME_RELEASE_REPO,
 } from '../../constants';
 import { Manager } from '../../services/runtime/Manager';
+import { getStoredConnectTimeoutMs, normalizeConnectTimeoutMs } from '../../settings/settingsHelpers';
 import { GaldurSettingsStore, RuntimeInstallStatus } from '../../types';
 import { getVaultPaths } from '../../utils/vault';
 import {
@@ -71,29 +72,32 @@ export class RuntimeSettingsSection {
             .addText((text) => {
                 const inputEl = text.inputEl;
                 text.setPlaceholder(String(DEFAULT_CONNECT_TIMEOUT_MS))
-                    .setValue(String(this.deps.store.settings.runtimeConnectTimeoutMs))
+                    .setValue(String(getStoredConnectTimeoutMs(this.deps.store.settings.runtimeConnectTimeoutMs)))
                     .onChange((value) => {
                         const parsed = Number.parseInt(value, 10);
                         if (!Number.isFinite(parsed) || parsed < MIN_CONNECT_TIMEOUT_MS) {
                             return;
                         }
-                        this.deps.store.settings.runtimeConnectTimeoutMs = parsed;
+                        this.deps.store.settings.runtimeConnectTimeoutMs = normalizeConnectTimeoutMs(parsed);
                         this.deps.saveDebounced();
                     });
                 inputEl.addEventListener('blur', () => {
                     const parsed = Number.parseInt(inputEl.value, 10);
                     if (!Number.isFinite(parsed) || parsed < MIN_CONNECT_TIMEOUT_MS) {
                         new Notice(`Connect timeout must be at least ${MIN_CONNECT_TIMEOUT_MS}ms`);
-                        inputEl.value = String(this.deps.store.settings.runtimeConnectTimeoutMs);
+                        inputEl.value = String(
+                            getStoredConnectTimeoutMs(this.deps.store.settings.runtimeConnectTimeoutMs)
+                        );
                         return;
                     }
 
-                    inputEl.value = String(parsed);
-                    if (this.deps.store.settings.runtimeConnectTimeoutMs === parsed) {
+                    const normalized = normalizeConnectTimeoutMs(parsed);
+                    inputEl.value = String(normalized);
+                    if (this.deps.store.settings.runtimeConnectTimeoutMs === normalized) {
                         return;
                     }
 
-                    this.deps.store.settings.runtimeConnectTimeoutMs = parsed;
+                    this.deps.store.settings.runtimeConnectTimeoutMs = normalized;
                     void this.deps.saveNow();
                 });
             });

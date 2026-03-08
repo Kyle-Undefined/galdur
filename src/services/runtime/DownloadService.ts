@@ -88,7 +88,11 @@ export class DownloadService {
 
                 if (normalizedError) {
                     if (outputPath) {
-                        void unlink(outputPath).catch(() => {});
+                        void unlink(outputPath).catch((e: NodeJS.ErrnoException) => {
+                            if (e.code !== 'ENOENT') {
+                                console.warn('[galdur] Failed to clean up partial download:', e)
+                            }
+                        });
                     }
                     reject(normalizedError);
                 } else {

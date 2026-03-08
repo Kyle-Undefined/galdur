@@ -1,4 +1,3 @@
-import { join } from 'path';
 import { DEFAULT_TOOL_PROFILE } from '../constants';
 import {
     CliTool,
@@ -10,6 +9,7 @@ import {
     VaultPaths,
 } from '../types';
 import { resolveExecutable } from '../services/executableResolver';
+import { getToolLogPath } from './toolLogPath';
 import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const GEMINI_TOOL_ID = 'gemini';
@@ -80,7 +80,7 @@ export class GeminiTool implements CliTool<'gemini'> {
     }
 
     public getDebugLogPath(vaultPaths: VaultPaths): string {
-        return join(vaultPaths.pluginDir, GEMINI_DEBUG_LOG_FILE);
+        return getToolLogPath(vaultPaths, GEMINI_DEBUG_LOG_FILE);
     }
 
     public buildArgs(settings: GaldurSettings): string[] {

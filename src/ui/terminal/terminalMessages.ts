@@ -1,5 +1,6 @@
 import { Terminal } from '@xterm/xterm';
 import { formatArgsForDisplay } from '../../tools/toolHelpers';
+import { ContextGuardSupportLevel } from '../../types';
 
 export type StartupBannerArgs = {
     command: string;
@@ -7,7 +8,26 @@ export type StartupBannerArgs = {
     commandSource: string;
     vaultPath: string;
     toolDisplayName: string;
+    debugLoggingEnabled: boolean;
     debugFilePath?: string;
+    contextGuard?: {
+        excludedTags: string[];
+        excludedNotePaths: string[];
+        supportLevel: ContextGuardSupportLevel;
+        supportMessage: string;
+    };
+};
+
+const DEFAULT_CONTEXT_GUARD = {
+    excludedTags: [],
+    excludedNotePaths: [],
+    supportLevel: 'none',
+    supportMessage: 'Global tag guard is off.',
+} as const satisfies {
+    excludedTags: readonly string[];
+    excludedNotePaths: readonly string[];
+    supportLevel: ContextGuardSupportLevel;
+    supportMessage: string;
 };
 
 export function writeToolMissingMessage(
@@ -26,14 +46,25 @@ export function writeToolMissingMessage(
 }
 
 export function writeStartupBanner(terminal: Terminal, config: StartupBannerArgs): void {
+    const contextGuard = config.contextGuard ?? DEFAULT_CONTEXT_GUARD;
+    const guardedNoteLabel = contextGuard.excludedNotePaths.length === 1 ? 'note' : 'notes';
+    const guardedTagLabel = contextGuard.excludedTags.length === 1 ? 'tag' : 'tags';
     terminal.writeln(`Spawning ${config.command} (${config.commandSource}) in ${config.vaultPath}`);
     terminal.writeln(`Tool: ${config.toolDisplayName}`);
-    terminal.writeln(`Args: ${formatArgsForDisplay(config.args)}`);
+    if (config.debugLoggingEnabled) {
+        terminal.writeln(`Args: ${formatArgsForDisplay(config.args)}`);
+    } else {
+        terminal.writeln('Args: hidden (enable debug logging to display launch args)');
+    }
     if (config.debugFilePath) {
         terminal.writeln(`Debug log: ${config.debugFilePath}`);
     } else {
         terminal.writeln('Debug logging: off');
     }
+    terminal.writeln(
+        `Context guard: ${contextGuard.supportLevel} (${contextGuard.excludedTags.length} ${guardedTagLabel}, ${contextGuard.excludedNotePaths.length} ${guardedNoteLabel})`
+    );
+    terminal.writeln(`Context guard detail: ${contextGuard.supportMessage}`);
 }
 
 export function writeNoOutputMessage(terminal: Terminal, startupTimeoutMs: number, debugFilePath?: string): void {
@@ -43,6 +74,15 @@ export function writeNoOutputMessage(terminal: Terminal, startupTimeoutMs: numbe
     if (debugFilePath) {
         terminal.writeln(`- debug log: ${debugFilePath}`);
     }
+}
+
+export function writeContextGuardStaleWarning(terminal: Terminal, previousCount: number, currentCount: number): void {
+    terminal.writeln('');
+    terminal.writeln('[context guard changed]');
+    const prevLabel = previousCount === 1 ? 'note' : 'notes';
+    const currLabel = currentCount === 1 ? 'note' : 'notes';
+    terminal.writeln(`Excluded note set changed from ${previousCount} ${prevLabel} to ${currentCount} ${currLabel}.`);
+    terminal.writeln('Restart the Galdur session to apply updated exclusions.');
 }
 
 export function writeRuntimeSetupHint(terminal: Terminal, runtimePath: string): void {

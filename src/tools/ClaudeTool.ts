@@ -1,4 +1,3 @@
-import { join } from 'path';
 import { DEFAULT_TOOL_PROFILE, TOOL_ARG_DEBUG_FILE, TOOL_ARG_PERMISSION_MODE } from '../constants';
 import {
     ClaudePermissionMode,
@@ -10,6 +9,7 @@ import {
     VaultPaths,
 } from '../types';
 import { resolveExecutable } from '../services/executableResolver';
+import { getToolLogPath } from './toolLogPath';
 import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const CLAUDE_TOOL_ID = 'claude';
@@ -67,7 +67,7 @@ export class ClaudeTool implements CliTool<'claude'> {
     }
 
     public getDebugLogPath(vaultPaths: VaultPaths): string {
-        return join(vaultPaths.pluginDir, CLAUDE_DEBUG_LOG_FILE);
+        return getToolLogPath(vaultPaths, CLAUDE_DEBUG_LOG_FILE);
     }
 
     public buildArgs(settings: GaldurSettings, debugFilePath?: string): string[] {
@@ -95,7 +95,8 @@ export class ClaudeTool implements CliTool<'claude'> {
             permissionModes: CLAUDE_PERMISSION_MODES,
             permissionModeDescription: `Passed as ${TOOL_ARG_PERMISSION_MODE} when supported by ${this.displayName}.`,
             supportsDebugLogging: true,
-            debugLoggingDescription: 'When enabled, writes tool debug output to a debug log file in the plugin folder.',
+            debugLoggingDescription:
+                'When enabled, writes tool debug output to a debug log file in the plugin logs folder.',
             extraArgsDescription:
                 'Optional extra args for the active tool. One command fragment per line, e.g. --model sonnet',
             extraArgsPlaceholder: '--model sonnet\n--append-system-prompt "Prefer small, focused diffs"',

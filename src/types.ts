@@ -68,9 +68,20 @@ export type CliToolSettingsSpec<TToolId extends ToolId = ToolId> = {
 
 export type ToolProfileRecord = { [K in ToolId]: ToolLaunchProfile<K> };
 
+export type ContextGuardSupportLevel = 'enforced' | 'partial' | 'advisory' | 'none';
+
+export type ResolvedContextGuard = {
+    excludedTags: string[];
+    excludedNotePaths: string[];
+    toolArgs: string[];
+    supportLevel: ContextGuardSupportLevel;
+    supportMessage: string;
+};
+
 export interface GaldurSettings {
     activeToolId: ToolId;
     toolProfiles: ToolProfileRecord;
+    excludedNoteTags: string[];
     runtimePath: string;
     runtimeVersion: string | null;
     runtimeAutoStart: boolean;

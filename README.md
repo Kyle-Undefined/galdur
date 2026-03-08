@@ -10,6 +10,8 @@ Galdur is for people who want CLI flexibility inside Obsidian instead of a fully
 
 It embeds terminal-backed AI workflows in a sidebar panel, so you can stay in your vault while still using the CLI behavior, flags, and permission modes you already know.
 
+It also includes an optional global tag-based context guard. You can mark Obsidian notes with tags such as `#private` or `#sensitive` and tell Galdur to keep those notes out of supported CLI file access paths.
+
 ## Requirements
 
 - Obsidian Desktop
@@ -51,9 +53,10 @@ Use this if you do not want to install through BRAT.
 
 1. Open `Settings -> Galdur`.
 2. Install the runtime if it is not already installed.
-3. Configure the tool profiles you want to use.
-4. Make sure the CLI you want to launch is available on `PATH`, or set its command/path override through your environment.
-5. Open the Galdur panel from the ribbon icon or the command palette.
+3. Configure any global context guard tags you want to apply across tools.
+4. Configure the tool profiles you want to use.
+5. Make sure the CLI you want to launch is available on `PATH`, or set its command/path override through your environment.
+6. Open the Galdur panel from the ribbon icon or the command palette.
 
 ## Supported tools
 
@@ -66,12 +69,38 @@ Galdur currently supports:
 
 Each tool has its own launch profile. Configure tool-specific permission presets, extra args, and debug logging behavior in plugin settings, then switch tools from the panel when you want to start a different CLI.
 
+## Context guard
+
+Galdur can apply one global list of Obsidian note tags as a context guard across supported CLI tools.
+
+- Configure `Excluded note tags` in `Settings -> Galdur -> Context guard`
+- Use one tag per line without the leading `#`
+- Example:
+  `private`
+  `sensitive/client`
+- Only Markdown notes are checked
+- Matching is case-insensitive
+- The guard applies when a session starts, not by rewriting files in your vault
+- If the excluded note set changes while a session is running, Galdur marks that session as stale and shows a restart-required warning in the terminal and status bar
+
+Current support levels:
+
+- Claude: tool-enforced with generated deny rules for tagged note paths (shell commands can still access tagged files)
+- Gemini: partial protection (file tools are blocked, but shell commands can still access tagged files)
+- Codex: advisory only (no technical enforcement; tagged files remain accessible to the CLI)
+- OpenCode: advisory only (no technical enforcement; tagged files remain accessible to the CLI)
+
+This is not a full filesystem sandbox. It is a best-effort launch guard that stays out of your vault root and writes its generated policy files under the plugin folder instead.
+
+The guard depends on Obsidian metadata. New notes or retagged notes may require Obsidian to finish indexing. If Galdur detects that the excluded note set changed during a live session, it warns that the session is stale and should be restarted before continuing.
+
 ## What the plugin does
 
 - Opens a sidebar terminal view inside Obsidian
 - Starts CLI sessions with the vault as the working directory
 - Lets you start or stop the active session from the panel toolbar
 - Lets you switch between Claude, Codex, Gemini, and OpenCode from the panel while keeping per-tool settings in plugin settings
+- Applies optional global tag-based context guard for supported tools
 - Manages the local PTY runtime used for terminal sessions
 - Writes tool debug logs for CLIs that support them
 - Exposes commands for toggling the panel, starting a session, and stopping a session
@@ -82,6 +111,7 @@ Each tool has its own launch profile. Configure tool-specific permission presets
 - Galdur launches a local runtime executable for PTY support. That executable is a packaged helper app containing Galdur's runtime code and `node-pty`; it is not a bundled AI model or bundled Claude, Codex, Gemini, or OpenCode install.
 - The selected CLI tool may read or write outside the vault depending on the CLI itself, the flags you pass, and the permission preset or mode you choose.
 - Galdur can access paths outside the vault when launching user-selected CLI tools.
+- Galdur's tag-based context guard provides technical enforcement for Claude, partial protection for Gemini (file tools only, not shell access), and no technical enforcement for Codex and OpenCode.
 - No client-side telemetry is included by default.
 
 ## Related plugins and inspiration
