@@ -3,7 +3,7 @@ import { mkdir, rm, unlink } from 'fs/promises';
 import { dirname, join } from 'path';
 import { RUNTIME_CHECKSUM_FILE, RUNTIME_DIR, RUNTIME_DIST_DIR, RUNTIME_RELEASE_BASE_URL } from '../../constants';
 import { VaultPaths } from '../../types';
-import { extractZipArchive, pathExists, probeRuntimeVersion } from './fileSystem';
+import { extractZipArchive, listDirectorySummary, pathExists, probeRuntimeVersion } from './fileSystem';
 import { atomicReplaceDirectory, removeManagedInstallDir } from './installFs';
 import { MetadataStore, VersionMetadata } from './MetadataStore';
 import { Paths } from './Paths';
@@ -196,7 +196,20 @@ export class Installer {
         buildVersionMismatchMessage: (runtimeVersion: string | null) => string
     ): Promise<string> {
         const stagedRuntimePath = join(stageDir, runtimeAsset);
+        if (!(await pathExists(stagedRuntimePath))) {
+            const summary = await listDirectorySummary(stageDir);
+            throw new Error(
+                `Installed runtime executable is missing after extraction: ${stagedRuntimePath}. Stage contents: ${summary}`
+            );
+        }
+
         const runtimeVersion = await probeRuntimeVersion(stagedRuntimePath);
+        if (runtimeVersion === null) {
+            console.warn(
+                `[galdur] Runtime version probe returned no result during install. Continuing with checksum-verified runtime ${expectedVersion}.`
+            );
+            return expectedVersion;
+        }
 
         if (runtimeVersion !== expectedVersion) {
             throw new Error(buildVersionMismatchMessage(runtimeVersion));

@@ -1,5 +1,6 @@
-import { access } from 'fs/promises';
-import { EXTRACT_TIMEOUT_MS, RUNTIME_ARG_VERSION, RUNTIME_VERSION_PROBE_TIMEOUT_MS } from '../../constants';
+import { access, mkdir, readdir } from 'fs/promises';
+import extractZip from 'extract-zip';
+import { RUNTIME_ARG_VERSION, RUNTIME_VERSION_PROBE_TIMEOUT_MS } from '../../constants';
 import { execFileText } from '../../utils/process';
 
 export async function pathExists(path: string): Promise<boolean> {
@@ -33,18 +34,21 @@ export async function probeRuntimeCommandVersion(
 }
 
 export async function extractZipArchive(archivePath: string, outputDir: string): Promise<void> {
-    await execFileText(
-        'powershell.exe',
-        [
-            '-NoProfile',
-            '-NonInteractive',
-            '-Command',
-            '& { param($ArchivePath, $OutputDir) Expand-Archive -LiteralPath $ArchivePath -DestinationPath $OutputDir -Force }',
-            archivePath,
-            outputDir,
-        ],
-        {
-            timeoutMs: EXTRACT_TIMEOUT_MS,
+    await mkdir(outputDir, { recursive: true });
+    await extractZip(archivePath, { dir: outputDir });
+}
+
+export async function listDirectorySummary(path: string): Promise<string> {
+    try {
+        const entries = await readdir(path, { withFileTypes: true });
+        if (entries.length === 0) {
+            return '(empty)';
         }
-    );
+        return entries
+            .slice(0, 12)
+            .map((entry) => `${entry.isDirectory() ? 'dir' : 'file'}:${entry.name}`)
+            .join(', ');
+    } catch (error) {
+        return `(unreadable: ${String(error)})`;
+    }
 }

@@ -45,7 +45,7 @@ export class RuntimeSettingsSection {
 
         new Setting(containerEl)
             .setName('Path override')
-            .setDesc('Optional command/path override. Leave empty to use managed runtime in plugin bin/ folder.')
+            .setDesc('Optional command/path override. Leave empty to use managed runtime in the plugin bin/ folder.')
             .addText((text) => {
                 text.setPlaceholder('C:\\path\\to\\galdur-runtime-windows-x64.exe')
                     .setValue(this.deps.store.settings.runtimePath)
@@ -164,7 +164,7 @@ export class RuntimeSettingsSection {
         }
 
         if (status.state === 'not-installed' || status.state === 'error') {
-            actions.setDesc('Install runtime into the vault plugin folder.');
+            actions.setDesc('Install runtime into the plugin folder.');
             addActionButton(actions, 'Install runtime', 'install', runAction, {
                 cta: true,
             });
