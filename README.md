@@ -118,7 +118,7 @@ The guard depends on Obsidian metadata. New notes or retagged notes may require 
 
 [Claudian](https://github.com/YishenTu/claudian) is a cleaner, more integrated Claude-in-Obsidian experience.
 
-Galdur exists for a different use case: a terminal-first workflow that keeps the flexibility of external AI CLIs and supports more than one tool. Claudian helped clarify that direction, and it is worth a look if you want a more native chat-style plugin.
+Galdur exists for a different use case: a terminal-first workflow that keeps the flexibility of external AI CLIs and supports more than one tool. Claudian is worth a look if you want a more native chat-style plugin.
 
 ## Troubleshooting
 

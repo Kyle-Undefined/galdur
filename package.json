@@ -1,6 +1,6 @@
 {
     "name": "galdur",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "description": "Galdur is an Obsidian plugin for running AI CLI tools in a sidebar terminal panel.",
     "main": "main.js",
     "scripts": {
