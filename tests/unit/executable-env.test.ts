@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFile } from 'fs/promises';
+import { realpath, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { resolveExecutable } from '../../src/services/executableResolver';
 import { buildSpawnEnv } from '../../src/ui/terminal/spawnEnv';
@@ -101,7 +101,7 @@ testOnWindows('resolveExecutable resolves from PATH when a matching command exis
 
         assert.equal(resolution.source, 'PATH');
         assert.equal(resolution.found, true);
-        assert.equal(resolution.command.toLowerCase(), commandPath.toLowerCase());
+        assert.equal((await realpath(resolution.command)).toLowerCase(), (await realpath(commandPath)).toLowerCase());
         assert.deepEqual(resolution.attempts, [`where.exe ${uniqueName}`]);
     } finally {
         restorePath();
