@@ -47,7 +47,32 @@
     background: var(--interactive-hover);
 }
 
+.galdur-terminal-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 0;
+    background: var(--interactive-normal);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.galdur-terminal-icon-btn:hover {
+    background: var(--interactive-hover);
+    color: var(--text-normal);
+}
+
+.galdur-terminal-icon-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 .galdur-terminal-btn:disabled,
+.galdur-terminal-icon-btn:disabled,
 .galdur-terminal-select:disabled {
     opacity: 0.6;
     cursor: default;

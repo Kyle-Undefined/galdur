@@ -35,6 +35,7 @@ export default class GaldurPlugin extends Plugin {
                         getSettings: () => this.settings,
                         saveSettings: async () => this.saveSettings(),
                         getPluginVersion: () => this.manifest.version,
+                        openSettings: () => this.openSettingsTab(),
                     },
                     this.runtimeManager,
                     () => this.getRuntimeHost()
@@ -252,6 +253,18 @@ export default class GaldurPlugin extends Plugin {
             view.stopSession();
             void this.app.workspace.revealLeaf(leaf);
         }
+    }
+
+    private openSettingsTab(): void {
+        const appWithSettings = this.app as typeof this.app & {
+            setting?: {
+                open(): void;
+                openTabById(tabId: string): void;
+            };
+        };
+
+        appWithSettings.setting?.open();
+        appWithSettings.setting?.openTabById(this.manifest.id);
     }
 
     private installXtermCss(): void {

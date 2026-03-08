@@ -50,6 +50,7 @@ export interface GaldurViewContext {
     getSettings(): GaldurSettings;
     saveSettings(): Promise<void>;
     getPluginVersion(): string;
+    openSettings(): void;
 }
 
 export interface CliTool {

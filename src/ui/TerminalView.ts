@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf } from 'obsidian';
+import { ItemView, setIcon, WorkspaceLeaf } from 'obsidian';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import {
@@ -26,6 +26,7 @@ import { orchestrateToolSessionLaunch } from './terminal/toolSessionOrchestrator
 
 export class TerminalView extends ItemView {
     private context: GaldurViewContext;
+    private settingsActionAdded = false;
     private terminal: Terminal | null = null;
     private fitAddon: FitAddon | null = null;
     private resizeObserver: ResizeObserver | null = null;
@@ -36,6 +37,7 @@ export class TerminalView extends ItemView {
     private toolSelectEl: HTMLSelectElement | null = null;
     private startBtnEl: HTMLButtonElement | null = null;
     private stopBtnEl: HTMLButtonElement | null = null;
+    private settingsBtnEl: HTMLButtonElement | null = null;
     private terminalHostEl: HTMLDivElement | null = null;
     private activeBackend: RuntimeBackend | null = null;
     private startPromise: Promise<void> | null = null;
@@ -70,6 +72,7 @@ export class TerminalView extends ItemView {
 
     public async onOpen(): Promise<void> {
         this.isClosed = false;
+        this.addSettingsAction();
         this.render();
         void this.startToolSessionTracked().catch(swallowError);
     }
@@ -110,6 +113,17 @@ export class TerminalView extends ItemView {
 
     public stopSession(): void {
         void this.stopSessionInternal('[session stopped]');
+    }
+
+    private addSettingsAction(): void {
+        if (this.settingsActionAdded) {
+            return;
+        }
+
+        this.addAction('settings', 'Open Galdur settings', () => {
+            this.context.openSettings();
+        });
+        this.settingsActionAdded = true;
     }
 
     private render(): void {
@@ -157,6 +171,20 @@ export class TerminalView extends ItemView {
             this.stopSession();
         });
         this.stopBtnEl = stopBtn;
+
+        const settingsBtn = actionsEl.createEl('button', {
+            cls: 'galdur-terminal-icon-btn',
+            attr: {
+                type: 'button',
+                'aria-label': 'Open Galdur settings',
+                title: 'Open Galdur settings',
+            },
+        });
+        setIcon(settingsBtn, 'settings');
+        settingsBtn.addEventListener('click', () => {
+            this.context.openSettings();
+        });
+        this.settingsBtnEl = settingsBtn;
 
         this.terminalHostEl = shellEl.createDiv({ cls: 'galdur-terminal-host' });
 
@@ -323,6 +351,7 @@ export class TerminalView extends ItemView {
         this.toolSelectEl = null;
         this.startBtnEl = null;
         this.stopBtnEl = null;
+        this.settingsBtnEl = null;
 
         this.terminalDataDisposable?.dispose();
         this.terminalDataDisposable = null;
