@@ -1,18 +1,21 @@
 import { App, EventRef } from 'obsidian';
 import { normalizeConfiguredTags } from '../../settings/settingsHelpers';
 import { GaldurSettings, ResolvedContextGuard } from '../../types';
-import { CachedFileMetadata, extractTagsFromCache, normalizeVaultRelativePath } from './TagContextGuardService';
+import { extractTagsFromCache, normalizeVaultRelativePath } from './TagContextGuardService';
+import {
+    EventSource,
+    getCachedFileMetadata,
+    getFileLikePath,
+    getMetadataEventSource,
+    getVaultEventSource,
+    isMarkdownFileLike,
+} from './obsidianContextGuardAdapter';
 
 type ContextGuardSnapshot = Pick<ResolvedContextGuard, 'excludedTags' | 'excludedNotePaths'>;
 type PendingChange =
     | { kind: 'delete'; path: string }
     | { kind: 'rename'; oldPath: string; newPath: string }
     | { kind: 'upsert'; path: string };
-
-type EventSource = {
-    on(name: string, callback: (...args: unknown[]) => void): EventRef;
-    offref(ref: EventRef): void;
-};
 
 type ContextGuardStalenessMonitorDeps = {
     app: App;
@@ -37,49 +40,49 @@ export class ContextGuardStalenessMonitor {
         if (this.subscriptions.length > 0) {
             return;
         }
-        this.subscribe(this.deps.app.vault as unknown as EventSource, 'create', (file) => {
+        this.subscribe(getVaultEventSource(this.deps.app), 'create', (file) => {
             const path = getNormalizedFilePath(file);
-            if (path && isMarkdownLikeFile(file)) {
+            if (path && isMarkdownFileLike(file)) {
                 this.scheduleCheck({
                     kind: 'upsert',
                     path,
                 });
             }
         });
-        this.subscribe(this.deps.app.vault as unknown as EventSource, 'delete', (file) => {
+        this.subscribe(getVaultEventSource(this.deps.app), 'delete', (file) => {
             const path = getNormalizedFilePath(file);
-            if (path && isMarkdownLikeFile(file)) {
+            if (path && isMarkdownFileLike(file)) {
                 this.scheduleCheck({
                     kind: 'delete',
                     path,
                 });
             }
         });
-        this.subscribe(this.deps.app.vault as unknown as EventSource, 'rename', (file, oldPath) => {
+        this.subscribe(getVaultEventSource(this.deps.app), 'rename', (file, oldPath) => {
             const newPath = getNormalizedFilePath(file);
             const previousPath = normalizeChangePath(oldPath);
-            if (newPath && previousPath && (isMarkdownLikeFile(file) || isMarkdownLikePath(previousPath))) {
+            if (newPath && previousPath && (isMarkdownFileLike(file) || isMarkdownLikePath(previousPath))) {
                 this.scheduleCheck({
                     kind: 'rename',
                     oldPath: previousPath,
                     newPath,
                 });
-            } else if (newPath && isMarkdownLikeFile(file)) {
+            } else if (newPath && isMarkdownFileLike(file)) {
                 this.scheduleCheck({ kind: 'upsert', path: newPath });
             } else if (previousPath && isMarkdownLikePath(previousPath)) {
                 this.scheduleCheck({ kind: 'delete', path: previousPath });
             }
         });
-        this.subscribe(this.deps.app.metadataCache as unknown as EventSource, 'changed', (file) => {
+        this.subscribe(getMetadataEventSource(this.deps.app), 'changed', (file) => {
             const path = getNormalizedFilePath(file);
-            if (path && isMarkdownLikeFile(file)) {
+            if (path && isMarkdownFileLike(file)) {
                 this.scheduleCheck({
                     kind: 'upsert',
                     path,
                 });
             }
         });
-        this.subscribe(this.deps.app.metadataCache as unknown as EventSource, 'resolved', () => {
+        this.subscribe(getMetadataEventSource(this.deps.app), 'resolved', () => {
             this.scheduleCheck();
         });
     }
@@ -229,10 +232,7 @@ export class ContextGuardStalenessMonitor {
     }
 
     private isCurrentlyExcluded(path: string, excludedTagSet: ReadonlySet<string>): boolean | null {
-        const metadataCache = this.deps.app.metadataCache as unknown as {
-            getFileCache(file: { path: string }): CachedFileMetadata | null;
-        };
-        const cache = metadataCache.getFileCache({ path });
+        const cache = getCachedFileMetadata(this.deps.app, path);
         if (!cache) {
             return null;
         }
@@ -254,34 +254,12 @@ function buildSnapshotSignature(snapshot: ContextGuardSnapshot): string {
     });
 }
 
-function isMarkdownLikeFile(value: unknown): boolean {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-
-    const record = value as { extension?: unknown; path?: unknown };
-    if (typeof record.extension === 'string') {
-        return record.extension.toLowerCase() === 'md';
-    }
-    if (typeof record.path === 'string') {
-        return isMarkdownLikePath(record.path);
-    }
-    return false;
-}
-
 function isMarkdownLikePath(value: unknown): boolean {
     return typeof value === 'string' && value.toLowerCase().endsWith('.md');
 }
 
-function getFilePath(value: unknown): string {
-    if (!value || typeof value !== 'object' || typeof (value as { path?: unknown }).path !== 'string') {
-        return '';
-    }
-    return (value as { path: string }).path;
-}
-
 function getNormalizedFilePath(value: unknown): string | null {
-    return normalizeChangePath(getFilePath(value));
+    return normalizeChangePath(getFileLikePath(value));
 }
 
 function normalizeChangePath(value: unknown): string | null {

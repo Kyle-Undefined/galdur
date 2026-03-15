@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
-import { createDefaultToolProfile, TOOL_EXTRA_ARGS_ROWS, TOOL_OPTIONS } from '../../constants';
+import { createDefaultToolProfile, isToolId, TOOL_EXTRA_ARGS_ROWS, TOOL_OPTIONS } from '../../constants';
 import { requireTool } from '../../tools/toolRegistry';
-import { GaldurSettingsStore, ToolId, ToolLaunchProfile, ToolPermissionMode } from '../../types';
+import { GaldurSettingsStore, ToolId, ToolLaunchProfile, ToolPermissionMode, ToolProfileRecord } from '../../types';
 
 type ToolSettingsSectionDeps = {
     store: GaldurSettingsStore;
@@ -9,6 +9,14 @@ type ToolSettingsSectionDeps = {
     saveDebounced: () => void;
     refresh: () => void;
 };
+
+function setToolProfile<TToolId extends ToolId>(
+    profiles: ToolProfileRecord,
+    toolId: TToolId,
+    profile: ToolLaunchProfile<TToolId>
+): void {
+    profiles[toolId] = profile as ToolProfileRecord[TToolId];
+}
 
 export class ToolSettingsSection {
     public constructor(private readonly deps: ToolSettingsSectionDeps) {}
@@ -26,7 +34,7 @@ export class ToolSettingsSection {
                     dropdown.addOption(toolId, tool.displayName);
                 }
                 dropdown.setValue(this.deps.store.settings.activeToolId).onChange(async (value) => {
-                    if (!this.isToolId(value)) {
+                    if (!isToolId(value)) {
                         return;
                     }
                     this.deps.store.settings.activeToolId = value;
@@ -91,7 +99,8 @@ export class ToolSettingsSection {
 
     private updateActiveProfile(mutator: (profile: ToolLaunchProfile) => ToolLaunchProfile): void {
         const toolId = this.deps.store.settings.activeToolId;
-        this.setActiveProfile(toolId, mutator(this.getActiveProfile()) as ToolLaunchProfile<typeof toolId>);
+        const nextProfile = mutator(this.getActiveProfile());
+        this.assignToolProfile(toolId, nextProfile);
     }
 
     private getActiveProfile(): ToolLaunchProfile {
@@ -107,15 +116,15 @@ export class ToolSettingsSection {
     }
 
     private setActiveProfile<TToolId extends ToolId>(toolId: TToolId, profile: ToolLaunchProfile<TToolId>): void {
-        (this.deps.store.settings.toolProfiles as Record<ToolId, ToolLaunchProfile>)[toolId] = profile;
+        this.assignToolProfile(toolId, profile);
+    }
+
+    private assignToolProfile<TToolId extends ToolId>(toolId: TToolId, profile: ToolLaunchProfile<TToolId>): void {
+        setToolProfile(this.deps.store.settings.toolProfiles, toolId, profile);
     }
 
     private isActiveToolPermissionMode(value: string): value is ToolPermissionMode {
         const tool = requireTool(this.deps.store.settings.activeToolId);
         return tool.getSettingsSpec().permissionModes.some((mode) => mode.value === value);
-    }
-
-    private isToolId(value: string): value is ToolId {
-        return TOOL_OPTIONS.includes(value as ToolId);
     }
 }

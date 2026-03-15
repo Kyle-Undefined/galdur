@@ -13,6 +13,11 @@ export type CommandResolution = {
     found: boolean;
 };
 
+export type ToolExecutionContext = {
+    wslEnabled: boolean;
+    wslDistro?: string;
+};
+
 export type ClaudePermissionMode = 'default' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk' | 'plan';
 
 export type CodexPermissionMode =
@@ -86,6 +91,8 @@ export interface GaldurSettings {
     runtimeVersion: string | null;
     runtimeAutoStart: boolean;
     runtimeConnectTimeoutMs: number;
+    wslEnabled: boolean;
+    wslDistro: string;
 }
 
 export interface GaldurSettingsStore {
@@ -105,7 +112,7 @@ export interface GaldurViewContext {
 export interface CliTool<TToolId extends ToolId = ToolId> {
     id: TToolId;
     displayName: string;
-    resolveCommand(): Promise<CommandResolution>;
+    resolveCommand(context?: ToolExecutionContext): Promise<CommandResolution>;
     getDebugLogPath(vaultPaths: VaultPaths): string;
     buildArgs(settings: GaldurSettings, debugFilePath?: string): string[];
     getSpawnEnvOverrides?(settings: GaldurSettings): NodeJS.ProcessEnv | undefined;

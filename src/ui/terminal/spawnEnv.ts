@@ -1,12 +1,20 @@
-import { delimiter, dirname, isAbsolute } from 'path';
+import { delimiter, posix, win32 } from 'path';
 import { TERM_ENV_VALUE } from '../../constants';
 import { stripOuterQuotes } from '../../utils/strings';
 
-export function buildSpawnEnv(command: string, baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function buildSpawnEnv(
+    command: string,
+    baseEnv: NodeJS.ProcessEnv = process.env,
+    wslMode = false
+): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {
         ...baseEnv,
         TERM: TERM_ENV_VALUE,
     };
+
+    if (wslMode) {
+        return env;
+    }
 
     const commandDir = getExecutableDir(command);
     if (!commandDir) {
@@ -28,11 +36,15 @@ function getExecutableDir(command: string): string | null {
     if (!normalized) {
         return null;
     }
-    if (!isAbsolute(normalized)) {
-        return null;
+    // Check for Windows-style paths first (drive letter or UNC)
+    if (/^[a-zA-Z]:[\\/]/.test(normalized) || normalized.startsWith('\\\\')) {
+        return win32.dirname(normalized);
     }
-
-    return dirname(normalized);
+    // Then check POSIX-style paths
+    if (posix.isAbsolute(normalized)) {
+        return posix.dirname(normalized);
+    }
+    return null;
 }
 
 function getPathEnvKey(env: NodeJS.ProcessEnv): string {
@@ -44,17 +56,16 @@ function getPathEnvKey(env: NodeJS.ProcessEnv): string {
 }
 
 function pathContainsEntry(pathValue: string, entry: string): boolean {
-    if (process.platform !== 'win32') {
-        throw new Error(`pathContainsEntry is only supported on Windows (current platform: ${process.platform})`);
-    }
-    const target = entry.toLowerCase();
+    const isWindowsPath = win32.isAbsolute(entry) && !posix.isAbsolute(entry);
+    const pathDelimiter = isWindowsPath ? ';' : delimiter;
+    const target = isWindowsPath ? entry.toLowerCase() : entry;
     return pathValue
-        .split(delimiter)
-        .map((part) =>
-            part
-                .trim()
-                .replace(/^"(.*)"$/, '$1')
-                .toLowerCase()
-        )
+        .split(pathDelimiter)
+        .map((part) => normalizePathEntry(part, isWindowsPath))
         .some((part) => part === target);
+}
+
+function normalizePathEntry(value: string, windowsStyle: boolean): string {
+    const normalized = value.trim().replace(/^"(.*)"$/, '$1');
+    return windowsStyle ? normalized.toLowerCase() : normalized;
 }

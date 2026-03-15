@@ -38,16 +38,26 @@ export async function execFileText(command: string, args: string[], options?: Ex
     });
 }
 
+export async function findWithWhere(executable: string): Promise<string[]> {
+    if (process.platform !== 'win32') {
+        throw new Error(`findWithWhere is only supported on Windows (current platform: ${process.platform})`);
+    }
+    try {
+        const output = await execFileText('where.exe', [executable], {
+            timeoutMs: COMMAND_LOOKUP_TIMEOUT_MS,
+        });
+        return output
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+    } catch {
+        return [];
+    }
+}
+
 export async function commandExistsOnPath(command: string): Promise<boolean> {
     if (process.platform !== 'win32') {
         throw new Error(`commandExistsOnPath is only supported on Windows (current platform: ${process.platform})`);
     }
-    try {
-        const output = await execFileText('where.exe', [command], {
-            timeoutMs: COMMAND_LOOKUP_TIMEOUT_MS,
-        });
-        return output.trim().length > 0;
-    } catch {
-        return false;
-    }
+    return (await findWithWhere(command)).length > 0;
 }

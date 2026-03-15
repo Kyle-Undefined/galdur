@@ -1,10 +1,10 @@
 import { ItemView, setIcon, WorkspaceLeaf } from 'obsidian';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
-import { TERMINAL_DEFAULTS, TERMINAL_RESIZE_DEBOUNCE_MS, TOOL_OPTIONS, VIEW_TYPE_GALDUR } from '../constants';
+import { isToolId, TERMINAL_DEFAULTS, TERMINAL_RESIZE_DEBOUNCE_MS, TOOL_OPTIONS, VIEW_TYPE_GALDUR } from '../constants';
 import { Manager } from '../services/runtime/Manager';
 import { HostService } from '../services/runtime/HostService';
-import { GaldurViewContext, ToolId } from '../types';
+import { GaldurViewContext } from '../types';
 import { swallowError } from '../utils/logging';
 import { getTool } from '../tools/toolRegistry';
 import { TERMINAL_STATUS, TerminalSessionController } from './terminal/TerminalSessionController';
@@ -21,6 +21,7 @@ export class TerminalView extends ItemView {
     private toolSelectEl: HTMLSelectElement | null = null;
     private startBtnEl: HTMLButtonElement | null = null;
     private stopBtnEl: HTMLButtonElement | null = null;
+    private clearBtnEl: HTMLButtonElement | null = null;
     private settingsBtnEl: HTMLButtonElement | null = null;
     private terminalHostEl: HTMLDivElement | null = null;
     private readonly controller: TerminalSessionController;
@@ -133,6 +134,15 @@ export class TerminalView extends ItemView {
         });
         this.stopBtnEl = stopBtn;
 
+        const clearBtn = actionsEl.createEl('button', {
+            cls: 'galdur-terminal-btn galdur-terminal-btn-secondary',
+            text: 'Clear',
+        });
+        clearBtn.addEventListener('click', () => {
+            this.clearTerminal();
+        });
+        this.clearBtnEl = clearBtn;
+
         const settingsBtn = actionsEl.createEl('button', {
             cls: 'galdur-terminal-icon-btn',
             attr: {
@@ -202,6 +212,7 @@ export class TerminalView extends ItemView {
         this.toolSelectEl = null;
         this.startBtnEl = null;
         this.stopBtnEl = null;
+        this.clearBtnEl = null;
         this.settingsBtnEl = null;
 
         this.terminalDataDisposable?.dispose();
@@ -228,7 +239,7 @@ export class TerminalView extends ItemView {
     }
 
     private async handleToolSelection(value: string): Promise<void> {
-        if (!this.isToolId(value) || this.controller.hasLiveSession()) {
+        if (!isToolId(value) || this.controller.hasLiveSession()) {
             this.syncControls();
             return;
         }
@@ -255,9 +266,13 @@ export class TerminalView extends ItemView {
         if (this.stopBtnEl) {
             this.stopBtnEl.disabled = !hasLiveSession;
         }
+        if (this.clearBtnEl) {
+            this.clearBtnEl.disabled = this.terminal === null;
+        }
     }
 
-    private isToolId(value: string): value is ToolId {
-        return TOOL_OPTIONS.includes(value as ToolId);
+    private clearTerminal(): void {
+        this.terminal?.clear();
+        this.terminal?.focus();
     }
 }

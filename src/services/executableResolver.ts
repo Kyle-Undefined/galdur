@@ -1,8 +1,8 @@
 import { access } from 'fs/promises';
-import { COMMAND_LOOKUP_TIMEOUT_MS } from '../constants';
-import { CommandResolution } from '../types';
+import { CommandResolution, ToolExecutionContext } from '../types';
+import { getWslExecutableLookupArgs, pathExistsInWsl, resolveExecutableInWsl, shellSingleQuote } from './wsl';
 import { looksLikePath, stripOuterQuotes } from '../utils/strings';
-import { execFileText } from '../utils/process';
+import { findWithWhere } from '../utils/process';
 
 export type ExecutableResolverOptions = {
     overrideEnvVar: string;
@@ -10,6 +10,8 @@ export type ExecutableResolverOptions = {
     commonPathCandidates: string[];
     fallbackCommand: string;
 };
+
+const SHELL_DISPLAY_METACHAR_RE = /[\s"'$`!*,?[\](){}<>|&;\\]/;
 
 export async function resolveExecutable(options: ExecutableResolverOptions): Promise<CommandResolution> {
     const attempts: string[] = [];
@@ -63,18 +65,68 @@ export async function resolveExecutable(options: ExecutableResolverOptions): Pro
     };
 }
 
-async function findWithWhere(executable: string): Promise<string[]> {
-    try {
-        const output = await execFileText('where.exe', [executable], {
-            timeoutMs: COMMAND_LOOKUP_TIMEOUT_MS,
-        });
-        return output
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
-    } catch {
-        return [];
+export function resolveCommandWithContext(
+    options: ExecutableResolverOptions,
+    context?: ToolExecutionContext
+): Promise<CommandResolution> {
+    return context?.wslEnabled
+        ? resolveExecutableWsl(options, context.wslDistro || undefined)
+        : resolveExecutable(options);
+}
+
+async function resolveExecutableWsl(options: ExecutableResolverOptions, distro?: string): Promise<CommandResolution> {
+    const attempts: string[] = [];
+
+    const override = process.env[options.overrideEnvVar]?.trim();
+    if (override) {
+        const normalized = stripOuterQuotes(override);
+        attempts.push(`${options.overrideEnvVar}=${normalized}`);
+        if (!looksLikePath(normalized)) {
+            return {
+                command: normalized,
+                source: `env:${options.overrideEnvVar}`,
+                attempts,
+                found: true,
+            };
+        }
+        if (normalized.startsWith('/') && (await pathExistsInWsl(normalized, distro))) {
+            return {
+                command: normalized,
+                source: `env:${options.overrideEnvVar}`,
+                attempts,
+                found: true,
+            };
+        }
+        if (normalized.startsWith('/')) {
+            attempts.push(`env override path not found in WSL: ${normalized}`);
+        } else {
+            attempts.push(`env override unusable in WSL (Windows-style path): ${normalized}`);
+        }
     }
+
+    for (const candidate of uniqueWslCandidates(options)) {
+        attempts.push(
+            ...getWslExecutableLookupArgs(candidate).map((lookupArgs) =>
+                `wsl.exe ${formatDistroForAttempt(distro)}${formatWslAttemptArgs(lookupArgs)}`.trim()
+            )
+        );
+        const result = await resolveExecutableInWsl(candidate, distro);
+        if (result) {
+            return {
+                command: result,
+                source: 'PATH',
+                attempts,
+                found: true,
+            };
+        }
+    }
+
+    return {
+        command: stripExecutableSuffix(options.fallbackCommand),
+        source: 'fallback',
+        attempts,
+        found: false,
+    };
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -84,4 +136,40 @@ async function fileExists(path: string): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+function uniqueWslCandidates(options: ExecutableResolverOptions): string[] {
+    const seen = new Set<string>();
+    const candidates = [...options.pathCandidates, ...options.commonPathCandidates, options.fallbackCommand];
+
+    return candidates
+        .map(stripExecutableSuffix)
+        .filter((candidate) => candidate.length > 0)
+        .filter((candidate) => {
+            if (candidate.includes('\\') || /^[A-Za-z]:/.test(candidate)) {
+                return false;
+            }
+            if (seen.has(candidate)) {
+                return false;
+            }
+            seen.add(candidate);
+            return true;
+        });
+}
+
+function stripExecutableSuffix(value: string): string {
+    return value.replace(/\.(?:exe|cmd)$/i, '');
+}
+
+function formatDistroForAttempt(distro?: string): string {
+    const trimmed = distro?.trim();
+    return trimmed ? `--distribution ${quoteAttemptArgForDisplay(trimmed)} -- ` : '-- ';
+}
+
+function formatWslAttemptArgs(args: string[]): string {
+    return args.map(quoteAttemptArgForDisplay).join(' ');
+}
+
+function quoteAttemptArgForDisplay(value: string): string {
+    return SHELL_DISPLAY_METACHAR_RE.test(value) ? shellSingleQuote(value) : value;
 }

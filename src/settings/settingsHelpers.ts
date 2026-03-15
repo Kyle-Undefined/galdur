@@ -1,6 +1,7 @@
 import {
     createDefaultToolProfile,
     DEFAULT_CONNECT_TIMEOUT_MS,
+    isToolId,
     MAX_CONNECT_TIMEOUT_MS,
     MIN_CONNECT_TIMEOUT_MS,
     TOOL_OPTIONS,
@@ -23,10 +24,10 @@ export type SanitizedLoadedSettings = Partial<
 export function mergeToolProfiles(loadedProfiles?: SanitizedToolProfiles): ToolProfileRecord {
     const merged = {} as ToolProfileRecord;
     for (const toolId of TOOL_OPTIONS) {
-        (merged as Record<ToolId, ToolLaunchProfile>)[toolId] = {
+        setToolProfile(merged, toolId, {
             ...createDefaultToolProfile(toolId),
             ...loadedProfiles?.[toolId],
-        };
+        });
     }
     return merged;
 }
@@ -48,6 +49,12 @@ export function sanitizeLoadedSettings(value: unknown): SanitizedLoadedSettings 
     }
     if (typeof value.runtimeAutoStart === 'boolean') {
         sanitized.runtimeAutoStart = value.runtimeAutoStart;
+    }
+    if (typeof value.wslEnabled === 'boolean') {
+        sanitized.wslEnabled = value.wslEnabled;
+    }
+    if (typeof value.wslDistro === 'string') {
+        sanitized.wslDistro = value.wslDistro;
     }
 
     const excludedNoteTags = sanitizeConfiguredTags(value.excludedNoteTags);
@@ -127,13 +134,20 @@ function sanitizeToolProfiles(value: unknown): SanitizedToolProfiles | undefined
     const sanitized: SanitizedToolProfiles = {};
     for (const toolId of TOOL_OPTIONS) {
         const profile = sanitizeToolProfile(toolId, value[toolId]);
-        if (!profile) {
-            continue;
+        if (profile) {
+            setToolProfile(sanitized, toolId, profile);
         }
-        (sanitized as Partial<Record<ToolId, Partial<ToolLaunchProfile>>>)[toolId] = profile;
     }
 
     return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+function setToolProfile<TToolId extends ToolId, TProfiles extends { [K in ToolId]?: unknown }>(
+    profiles: TProfiles,
+    toolId: TToolId,
+    profile: TProfiles[TToolId]
+): void {
+    profiles[toolId] = profile;
 }
 
 function sanitizeToolProfile<TToolId extends ToolId>(
@@ -156,10 +170,6 @@ function sanitizeToolProfile<TToolId extends ToolId>(
     }
 
     return Object.keys(profile).length > 0 ? profile : undefined;
-}
-
-function isToolId(value: unknown): value is ToolId {
-    return typeof value === 'string' && TOOL_OPTIONS.includes(value as ToolId);
 }
 
 function isPermissionMode<TToolId extends ToolId>(

@@ -5,11 +5,12 @@ import {
     CommandResolution,
     GaldurSettings,
     OpenCodePermissionMode,
+    ToolExecutionContext,
     ToolPermissionModeOption,
     VaultPaths,
 } from '../types';
-import { resolveExecutable } from '../services/executableResolver';
-import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
+import { resolveCommandWithContext } from '../services/executableResolver';
+import { expandCommonPaths, makeCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const OPENCODE_TOOL_ID = 'opencode';
 const OPENCODE_DISPLAY_NAME = 'OpenCode';
@@ -20,28 +21,9 @@ const OPENCODE_BINARY_EXE = 'opencode.exe';
 const OPENCODE_PERMISSION_ENV_VAR = 'OPENCODE_PERMISSION';
 const OPENCODE_MISSING_CLI_HELP = `Set ${OPENCODE_OVERRIDE_ENV_VAR} or add OpenCode CLI to PATH, then restart Obsidian.`;
 
-const OPENCODE_PATH_NAMES_PREFER_CMD = [OPENCODE_BINARY_CMD, OPENCODE_BINARY_EXE] as const;
-const OPENCODE_PATH_NAMES_PREFER_EXE = [OPENCODE_BINARY_EXE, OPENCODE_BINARY_CMD] as const;
 const OPENCODE_PATH_CANDIDATES = [OPENCODE_BINARY_CMD, OPENCODE_BINARY_EXE, OPENCODE_BINARY] as const;
 
-const OPENCODE_COMMON_PATHS = [
-    { envVar: 'APPDATA', subPath: 'npm', names: OPENCODE_PATH_NAMES_PREFER_CMD },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.local/bin',
-        names: OPENCODE_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.bun/bin',
-        names: OPENCODE_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'LOCALAPPDATA',
-        subPath: 'pnpm',
-        names: OPENCODE_PATH_NAMES_PREFER_CMD,
-    },
-] as const;
+const OPENCODE_COMMON_PATHS = makeCommonPaths(OPENCODE_BINARY_CMD, OPENCODE_BINARY_EXE);
 
 const OPENCODE_PERMISSION_MODES: readonly ToolPermissionModeOption<OpenCodePermissionMode>[] = [
     { value: 'default', label: 'CLI default' },
@@ -55,13 +37,16 @@ export class OpenCodeTool implements CliTool<'opencode'> {
     public readonly id = OPENCODE_TOOL_ID;
     public readonly displayName = OPENCODE_DISPLAY_NAME;
 
-    public async resolveCommand(): Promise<CommandResolution> {
-        return await resolveExecutable({
-            overrideEnvVar: OPENCODE_OVERRIDE_ENV_VAR,
-            pathCandidates: [...OPENCODE_PATH_CANDIDATES],
-            commonPathCandidates: expandCommonPaths(OPENCODE_COMMON_PATHS),
-            fallbackCommand: OPENCODE_BINARY,
-        });
+    public async resolveCommand(context?: ToolExecutionContext): Promise<CommandResolution> {
+        return resolveCommandWithContext(
+            {
+                overrideEnvVar: OPENCODE_OVERRIDE_ENV_VAR,
+                pathCandidates: [...OPENCODE_PATH_CANDIDATES],
+                commonPathCandidates: context?.wslEnabled ? [] : expandCommonPaths(OPENCODE_COMMON_PATHS),
+                fallbackCommand: OPENCODE_BINARY,
+            },
+            context
+        );
     }
 
     public getDebugLogPath(_vaultPaths: VaultPaths): string {

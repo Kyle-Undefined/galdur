@@ -20,7 +20,7 @@ export const NODE_MODULES_DIR = 'node_modules';
 export const RUNTIME_DIR = 'runtime';
 export const RUNTIME_DIST_DIR = 'dist';
 
-export const TOOL_OPTIONS: ToolId[] = ['claude', 'codex', 'gemini', 'opencode'];
+export const TOOL_OPTIONS = ['claude', 'codex', 'gemini', 'opencode'] as const satisfies readonly ToolId[];
 export const TOOL_ARG_DEBUG_FILE = '--debug-file';
 export const TOOL_ARG_PERMISSION_MODE = '--permission-mode';
 
@@ -103,4 +103,10 @@ export const DEFAULT_SETTINGS: GaldurSettings = {
     runtimeVersion: null,
     runtimeAutoStart: true,
     runtimeConnectTimeoutMs: DEFAULT_CONNECT_TIMEOUT_MS,
+    wslEnabled: false,
+    wslDistro: '',
 };
+
+export function isToolId(value: unknown): value is ToolId {
+    return typeof value === 'string' && (TOOL_OPTIONS as readonly string[]).includes(value);
+}

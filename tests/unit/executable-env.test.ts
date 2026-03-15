@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { realpath, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { resolveExecutable } from '../../src/services/executableResolver';
+import { resolveCommandWithContext, resolveExecutable } from '../../src/services/executableResolver';
+import { parseResolvedExecutablePath, windowsPathToWsl, wrapCommandForWsl } from '../../src/services/wsl';
 import { buildSpawnEnv } from '../../src/ui/terminal/spawnEnv';
 import { TERM_ENV_VALUE } from '../../src/constants';
 import { createTempDir, removeTempDir } from '../helpers/tempDir';
@@ -181,4 +182,83 @@ testOnWindows('buildSpawnEnv leaves PATH unchanged for non-absolute commands and
     assert.equal(env.PATH, 'C:\\Windows\\System32');
     assert.equal(Object.prototype.hasOwnProperty.call(env, 'PATH'), true);
     assert.equal(Object.prototype.hasOwnProperty.call(env, 'Path'), false);
+});
+
+test('windowsPathToWsl translates a Windows drive path into a /mnt path', () => {
+    assert.equal(windowsPathToWsl('C:\\Users\\kyle\\vault'), '/mnt/c/Users/kyle/vault');
+});
+
+test('wrapCommandForWsl prefixes the Linux command with wsl.exe, distro, and Linux cwd', () => {
+    assert.deepEqual(wrapCommandForWsl('claude', ['--model', 'sonnet'], 'Ubuntu', '/mnt/c/vault'), {
+        command: 'wsl.exe',
+        args: ['--distribution', 'Ubuntu', '--cd', '/mnt/c/vault', '--', 'claude', '--model', 'sonnet'],
+    });
+});
+
+test('wrapCommandForWsl prefixes absolute Linux commands with env PATH=... so shebang dependencies resolve', () => {
+    assert.deepEqual(wrapCommandForWsl('/home/kyle/.nvm/versions/node/v24.13.0/bin/codex', ['--version']), {
+        command: 'wsl.exe',
+        args: [
+            '--',
+            'env',
+            'PATH=/home/kyle/.nvm/versions/node/v24.13.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+            '/home/kyle/.nvm/versions/node/v24.13.0/bin/codex',
+            '--version',
+        ],
+    });
+});
+
+test('buildSpawnEnv in WSL mode keeps PATH unchanged while still forcing TERM', () => {
+    const env = buildSpawnEnv('/home/kyle/.local/bin/codex', { PATH: '/usr/bin', TERM: 'vt100' }, true);
+
+    assert.equal(env.TERM, TERM_ENV_VALUE);
+    assert.equal(env.PATH, '/usr/bin');
+});
+
+test('parseResolvedExecutablePath ignores shell noise and returns the first absolute linux path', () => {
+    assert.equal(
+        parseResolvedExecutablePath('/ is a directory\n/home/kyle/.local/bin/claude\n'),
+        '/home/kyle/.local/bin/claude'
+    );
+});
+
+test('parseResolvedExecutablePath prefers native Linux paths over /mnt-mounted Windows shims', () => {
+    assert.equal(
+        parseResolvedExecutablePath('/mnt/c/Users/kyleu/AppData/Roaming/npm/codex\n/home/kyle/.local/bin/codex\n'),
+        '/home/kyle/.local/bin/codex'
+    );
+});
+
+test('parseResolvedExecutablePath ignores mounted Windows shim paths when no native Linux path is present', () => {
+    assert.equal(parseResolvedExecutablePath('/mnt/c/Users/kyleu/AppData/Roaming/npm/codex\n'), null);
+});
+
+test('resolveCommandWithContext leaves plain WSL attempt tokens unquoted', async () => {
+    const resolution = await resolveCommandWithContext(
+        {
+            overrideEnvVar: 'GALDUR_TEST_CMD',
+            pathCandidates: ['claude'],
+            commonPathCandidates: [],
+            fallbackCommand: 'claude',
+        },
+        { wslEnabled: true, wslDistro: 'Ubuntu' }
+    );
+
+    assert.equal(resolution.found, false);
+    assert.match(resolution.attempts[0], /^wsl\.exe --distribution Ubuntu -- sh -lc /);
+});
+
+test('resolveCommandWithContext quotes WSL attempt arguments containing shell metacharacters', async () => {
+    const resolution = await resolveCommandWithContext(
+        {
+            overrideEnvVar: 'GALDUR_TEST_CMD',
+            pathCandidates: ['codex'],
+            commonPathCandidates: [],
+            fallbackCommand: 'codex',
+        },
+        { wslEnabled: true, wslDistro: "Ubuntu Preview it's" }
+    );
+
+    assert.equal(resolution.found, false);
+    assert.match(resolution.attempts[0], /^wsl\.exe --distribution 'Ubuntu Preview it'\\''s' -- sh -lc /);
 });

@@ -10,13 +10,8 @@ import { GaldurViewContext, ResolvedContextGuard, RuntimeBackend } from '../../t
 import { swallowError } from '../../utils/logging';
 import { getVaultPaths } from '../../utils/vault';
 import { getTool } from '../../tools/toolRegistry';
-import {
-    writeContextGuardStaleWarning,
-    writeNoOutputMessage,
-    writeRuntimeSetupHint,
-    writeStartupBanner,
-    writeToolMissingMessage,
-} from './terminalMessages';
+import { writeContextGuardStaleWarning, writeRuntimeSetupHint } from './terminalMessages';
+import { createTerminalSessionLaunchHooks } from './createTerminalSessionLaunchHooks';
 import { orchestrateToolSessionLaunch } from './toolSessionOrchestrator';
 
 export const TERMINAL_STATUS = {
@@ -174,6 +169,27 @@ export class TerminalSessionController {
             excludedTags: [...contextGuard.excludedTags],
             excludedNotePaths: [...contextGuard.excludedNotePaths],
         };
+        const launchHooks = createTerminalSessionLaunchHooks({
+            getTerminal: () => this.deps.getTerminal(),
+            getActiveBackend: () => this.activeBackend,
+            setActiveBackend: (backend) => {
+                this.activeBackend = backend;
+            },
+            updateStatus: (status) => {
+                this.updateStatus(status);
+            },
+            onControlsChange: () => this.deps.onControlsChange(),
+            onExit: (event) => {
+                this.deps
+                    .getTerminal()
+                    ?.writeln(`[session exited] code=${event.exitCode} signal=${String(event.signal)}`);
+            },
+            vaultPath: vaultPaths.vaultPath,
+            runningStatus: TERMINAL_STATUS.running,
+            runningNoOutputStatus: TERMINAL_STATUS.runningNoOutput,
+            cliNotFoundStatus: TERMINAL_STATUS.cliNotFound,
+            stoppedStatus: TERMINAL_STATUS.stopped,
+        });
         const launchResult = await orchestrateToolSessionLaunch({
             settings,
             tool,
@@ -182,66 +198,7 @@ export class TerminalSessionController {
             terminal: { cols: terminal.cols, rows: terminal.rows },
             createBackend: () => createBackend(this.deps.getRuntimeHost(), settings),
             isStale: () => this.isStartStale(startId),
-            hooks: {
-                onCommandMissing: (missing) => {
-                    this.updateStatus(TERMINAL_STATUS.cliNotFound);
-                    const activeTerminal = this.deps.getTerminal();
-                    if (!activeTerminal) {
-                        return;
-                    }
-                    writeToolMissingMessage(
-                        activeTerminal,
-                        missing.toolDisplayName,
-                        missing.missingHelp,
-                        missing.attempts
-                    );
-                },
-                onPrepared: (launch) => {
-                    const activeTerminal = this.deps.getTerminal();
-                    if (!activeTerminal) {
-                        return;
-                    }
-                    writeStartupBanner(activeTerminal, {
-                        command: launch.command,
-                        args: launch.args,
-                        commandSource: launch.commandSource,
-                        vaultPath: vaultPaths.vaultPath,
-                        toolDisplayName: launch.toolDisplayName,
-                        debugLoggingEnabled: launch.debugLoggingEnabled,
-                        debugFilePath: launch.debugFilePath,
-                        contextGuard: launch.contextGuard,
-                    });
-                    this.updateStatus(TERMINAL_STATUS.running);
-                },
-                onBackendCreated: (backend) => {
-                    this.activeBackend = backend;
-                },
-                onData: (data, backend) => {
-                    if (this.activeBackend !== backend) {
-                        return;
-                    }
-                    this.deps.getTerminal()?.write(data);
-                },
-                onExit: (event, backend) => {
-                    if (this.activeBackend !== backend) {
-                        return;
-                    }
-                    this.activeBackend = null;
-                    this.updateStatus(TERMINAL_STATUS.stopped);
-                    this.deps.onControlsChange();
-                    this.deps
-                        .getTerminal()
-                        ?.writeln(`[session exited] code=${event.exitCode} signal=${String(event.signal)}`);
-                },
-                onNoOutput: (launch, backend) => {
-                    const activeTerminal = this.deps.getTerminal();
-                    if (this.activeBackend !== backend || !activeTerminal) {
-                        return;
-                    }
-                    this.updateStatus(TERMINAL_STATUS.runningNoOutput);
-                    writeNoOutputMessage(activeTerminal, launch.startupTimeoutMs, launch.debugFilePath);
-                },
-            },
+            hooks: launchHooks,
         });
 
         if (launchResult.kind === 'aborted' || launchResult.kind === 'missing-cli') {
@@ -266,8 +223,10 @@ export class TerminalSessionController {
             this.updateStatus(TERMINAL_STATUS.failedToStart);
             terminal.writeln('');
             terminal.writeln(`[spawn exception] ${String(launchResult.error)}`);
-            terminal.writeln('');
-            writeRuntimeSetupHint(terminal, this.deps.runtimeManager.getResolvedRuntimePath(vaultPaths, settings));
+            if (shouldShowRuntimeSetupHint(launchResult.error)) {
+                terminal.writeln('');
+                writeRuntimeSetupHint(terminal, this.deps.runtimeManager.getResolvedRuntimePath(vaultPaths, settings));
+            }
             return;
         }
 
@@ -364,4 +323,14 @@ export class TerminalSessionController {
             this.updateStatus(TERMINAL_STATUS.starting);
         }
     }
+}
+
+function shouldShowRuntimeSetupHint(error: unknown): boolean {
+    const message = String(error).toLowerCase();
+    return (
+        message.includes('runtime executable not accessible') ||
+        message.includes('runtime command not found') ||
+        message.includes('failed to start runtime process') ||
+        message.includes('failed to connect to runtime')
+    );
 }

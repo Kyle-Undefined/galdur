@@ -6,6 +6,12 @@ import { createRequest } from '../../src/services/runtime/createRequest';
 import { parseArgs } from '../../runtime/src/args';
 import { Paths } from '../../src/services/runtime/Paths';
 import type { VaultPaths } from '../../src/types';
+import {
+    createEmptyPayloadResponse,
+    isResponsePayloadForType,
+    isRuntimeEvent,
+    parseRuntimeSpawnPayload,
+} from '../../shared/ipc-codecs';
 
 const testOnWindows = process.platform === 'win32' ? test : test.skip;
 
@@ -92,6 +98,54 @@ test('parseArgs falls back to default protocol version and false booleans when o
             process.env[RUNTIME_AUTH_TOKEN_ENV_VAR] = original;
         }
     }
+});
+
+test('shared IPC codecs validate spawn payloads and empty responses', () => {
+    const spawnPayload = parseRuntimeSpawnPayload({
+        command: 'claude',
+        args: ['--model', 'sonnet'],
+        cwd: 'C:\\vault',
+        cols: 80,
+        rows: 24,
+        env: { TERM: 'xterm-256color' },
+    });
+
+    assert.deepEqual(spawnPayload, {
+        command: 'claude',
+        args: ['--model', 'sonnet'],
+        cwd: 'C:\\vault',
+        cols: 80,
+        rows: 24,
+        env: { TERM: 'xterm-256color' },
+    });
+    assert.equal(parseRuntimeSpawnPayload({ command: 'claude' }), null);
+
+    const emptyPayload = createEmptyPayloadResponse('write');
+    assert.deepEqual(emptyPayload, {});
+    assert.equal(isResponsePayloadForType('write', emptyPayload), true);
+});
+
+test('shared IPC codecs validate runtime events', () => {
+    assert.equal(
+        isRuntimeEvent({
+            event: 'exit',
+            payload: {
+                sessionId: 'session-1',
+                event: { exitCode: 0 },
+            },
+        }),
+        true
+    );
+    assert.equal(
+        isRuntimeEvent({
+            event: 'exit',
+            payload: {
+                sessionId: 'session-1',
+                event: { exitCode: '0' },
+            },
+        }),
+        false
+    );
 });
 
 testOnWindows('Paths builds install, logs, and metadata paths relative to the vault', () => {

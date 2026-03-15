@@ -5,12 +5,13 @@ import {
     CliToolSettingsSpec,
     CommandResolution,
     GaldurSettings,
+    ToolExecutionContext,
     ToolPermissionModeOption,
     VaultPaths,
 } from '../types';
-import { resolveExecutable } from '../services/executableResolver';
+import { resolveCommandWithContext } from '../services/executableResolver';
 import { getToolLogPath } from './toolLogPath';
-import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
+import { expandCommonPaths, makeCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const CLAUDE_TOOL_ID = 'claude';
 const CLAUDE_DISPLAY_NAME = 'Claude';
@@ -21,28 +22,9 @@ const CLAUDE_BINARY_EXE = 'claude.exe';
 const CLAUDE_DEBUG_LOG_FILE = 'claude-debug.log';
 const CLAUDE_MISSING_CLI_HELP = `Set ${CLAUDE_OVERRIDE_ENV_VAR} or add Claude Code CLI to PATH, then restart Obsidian.`;
 
-const CLAUDE_PATH_NAMES_PREFER_CMD = [CLAUDE_BINARY_CMD, CLAUDE_BINARY_EXE] as const;
-const CLAUDE_PATH_NAMES_PREFER_EXE = [CLAUDE_BINARY_EXE, CLAUDE_BINARY_CMD] as const;
 const CLAUDE_PATH_CANDIDATES = [CLAUDE_BINARY_CMD, CLAUDE_BINARY_EXE, CLAUDE_BINARY] as const;
 
-const CLAUDE_COMMON_PATHS = [
-    { envVar: 'APPDATA', subPath: 'npm', names: CLAUDE_PATH_NAMES_PREFER_CMD },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.local/bin',
-        names: CLAUDE_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.bun/bin',
-        names: CLAUDE_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'LOCALAPPDATA',
-        subPath: 'pnpm',
-        names: CLAUDE_PATH_NAMES_PREFER_CMD,
-    },
-] as const;
+const CLAUDE_COMMON_PATHS = makeCommonPaths(CLAUDE_BINARY_CMD, CLAUDE_BINARY_EXE);
 
 const CLAUDE_PERMISSION_MODES: readonly ToolPermissionModeOption<ClaudePermissionMode>[] = [
     { value: 'default', label: 'default' },
@@ -57,13 +39,16 @@ export class ClaudeTool implements CliTool<'claude'> {
     public readonly id = CLAUDE_TOOL_ID;
     public readonly displayName = CLAUDE_DISPLAY_NAME;
 
-    public async resolveCommand(): Promise<CommandResolution> {
-        return await resolveExecutable({
-            overrideEnvVar: CLAUDE_OVERRIDE_ENV_VAR,
-            pathCandidates: [...CLAUDE_PATH_CANDIDATES],
-            commonPathCandidates: expandCommonPaths(CLAUDE_COMMON_PATHS),
-            fallbackCommand: CLAUDE_BINARY,
-        });
+    public async resolveCommand(context?: ToolExecutionContext): Promise<CommandResolution> {
+        return resolveCommandWithContext(
+            {
+                overrideEnvVar: CLAUDE_OVERRIDE_ENV_VAR,
+                pathCandidates: [...CLAUDE_PATH_CANDIDATES],
+                commonPathCandidates: context?.wslEnabled ? [] : expandCommonPaths(CLAUDE_COMMON_PATHS),
+                fallbackCommand: CLAUDE_BINARY,
+            },
+            context
+        );
     }
 
     public getDebugLogPath(vaultPaths: VaultPaths): string {

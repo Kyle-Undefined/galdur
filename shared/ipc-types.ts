@@ -2,6 +2,10 @@ export type TerminalExitEvent = { exitCode: number; signal?: number };
 
 export type RuntimeCommandType = 'ping' | 'spawn' | 'write' | 'resize' | 'kill';
 
+export type EmptyResponseCommandType = {
+    [K in RuntimeCommandType]: RuntimeResponsePayloadMap[K] extends Record<string, never> ? K : never;
+}[RuntimeCommandType];
+
 export type RuntimeSpawnPayload = {
     command: string;
     args: string[];

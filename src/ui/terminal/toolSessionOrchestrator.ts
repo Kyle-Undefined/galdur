@@ -7,8 +7,10 @@ import {
     ResolvedContextGuard,
     RuntimeBackend,
     TerminalExitEvent,
+    ToolExecutionContext,
     VaultPaths,
 } from '../../types';
+import { windowsPathToWsl, wrapCommandForWsl } from '../../services/wsl';
 import { buildSpawnEnv } from './spawnEnv';
 
 export type PreparedToolLaunch = {
@@ -63,7 +65,11 @@ export type ToolSessionLaunchResult =
 export async function orchestrateToolSessionLaunch(
     args: ToolSessionOrchestratorArgs
 ): Promise<ToolSessionLaunchResult> {
-    const commandResolution = await args.tool.resolveCommand();
+    const executionContext: ToolExecutionContext = {
+        wslEnabled: args.settings.wslEnabled,
+        wslDistro: args.settings.wslDistro,
+    };
+    const commandResolution = await args.tool.resolveCommand(executionContext);
     if (args.isStale()) {
         return { kind: 'aborted' };
     }
@@ -79,6 +85,10 @@ export async function orchestrateToolSessionLaunch(
 
     const profile = args.settings.toolProfiles[args.settings.activeToolId] ?? DEFAULT_TOOL_PROFILE;
     const debugFilePath = args.tool.getDebugLogPath(args.vaultPaths);
+    const resolvedDebugFilePath =
+        profile.debugLoggingEnabled && args.settings.wslEnabled && debugFilePath
+            ? windowsPathToWsl(debugFilePath)
+            : debugFilePath;
     const contextGuard = args.contextGuard ?? {
         excludedTags: [],
         excludedNotePaths: [],
@@ -86,16 +96,36 @@ export async function orchestrateToolSessionLaunch(
         supportLevel: 'none',
         supportMessage: 'Global tag guard is off.',
     };
+    const contextGuardToolArgs = args.settings.wslEnabled
+        ? translateContextGuardArgsForWsl(contextGuard.toolArgs)
+        : contextGuard.toolArgs;
+    const launchCommandAndArgs = args.settings.wslEnabled
+        ? wrapCommandForWsl(
+              commandResolution.command,
+              [
+                  ...args.tool.buildArgs(
+                      args.settings,
+                      profile.debugLoggingEnabled ? resolvedDebugFilePath : undefined
+                  ),
+                  ...contextGuardToolArgs,
+              ],
+              args.settings.wslDistro,
+              windowsPathToWsl(args.vaultPaths.vaultPath)
+          )
+        : {
+              command: commandResolution.command,
+              args: [
+                  ...args.tool.buildArgs(args.settings, profile.debugLoggingEnabled ? debugFilePath : undefined),
+                  ...contextGuardToolArgs,
+              ],
+          };
     const launch: PreparedToolLaunch = {
-        command: commandResolution.command,
+        command: launchCommandAndArgs.command,
         commandSource: commandResolution.source,
-        args: [
-            ...args.tool.buildArgs(args.settings, profile.debugLoggingEnabled ? debugFilePath : undefined),
-            ...contextGuard.toolArgs,
-        ],
+        args: launchCommandAndArgs.args,
         toolDisplayName: args.tool.displayName,
         debugLoggingEnabled: profile.debugLoggingEnabled,
-        debugFilePath: profile.debugLoggingEnabled ? debugFilePath : undefined,
+        debugFilePath: profile.debugLoggingEnabled ? resolvedDebugFilePath : undefined,
         startupTimeoutMs: args.startupTimeoutMs ?? STARTUP_TIMEOUT_MS,
         contextGuard,
     };
@@ -122,7 +152,11 @@ export async function orchestrateToolSessionLaunch(
         cwd: args.vaultPaths.vaultPath,
         cols,
         rows,
-        env: buildSpawnEnv(launch.command, toolEnvOverrides ? { ...process.env, ...toolEnvOverrides } : process.env),
+        env: buildSpawnEnv(
+            launch.command,
+            toolEnvOverrides ? { ...process.env, ...toolEnvOverrides } : process.env,
+            args.settings.wslEnabled
+        ),
         startupTimeoutMs: launch.startupTimeoutMs,
         onData: (data) => {
             args.hooks.onData(data, backend);
@@ -146,4 +180,20 @@ export async function orchestrateToolSessionLaunch(
     }
 
     return { kind: 'started', backend, pid: result.pid, launch };
+}
+
+function translateContextGuardArgsForWsl(args: string[]): string[] {
+    const translated = [...args];
+    for (let index = 0; index < translated.length - 1; index++) {
+        if (!isContextGuardPathFlag(translated[index])) {
+            continue;
+        }
+        translated[index + 1] = windowsPathToWsl(translated[index + 1]);
+        index++;
+    }
+    return translated;
+}
+
+function isContextGuardPathFlag(value: string): boolean {
+    return value === '--settings' || value === '--policy';
 }

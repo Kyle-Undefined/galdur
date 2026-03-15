@@ -3,15 +3,14 @@ import { parseArgs } from './args';
 import { getPtyModule } from './ptyLoader';
 import { SessionManager } from './sessionManager';
 import {
-    RuntimeEvent,
-    RuntimeKillPayload,
-    RuntimeRequest,
-    RuntimeResizePayload,
-    RuntimeResponse,
-    RuntimeSocketMessage,
-    RuntimeSpawnPayload,
-    RuntimeWritePayload,
-} from '../../shared/ipc-types';
+    createEmptyPayloadResponse,
+    isRuntimeRequest,
+    parseRuntimeKillPayload,
+    parseRuntimeResizePayload,
+    parseRuntimeSpawnPayload,
+    parseRuntimeWritePayload,
+} from '../../shared/ipc-codecs';
+import { RuntimeEvent, RuntimeResponse, RuntimeSocketMessage } from '../../shared/ipc-types';
 import { resolveRuntimeVersion } from './version';
 import { IPC_MAX_LINE_LENGTH, RUNTIME_ARG_PIPE_PATH, RUNTIME_AUTH_TOKEN_ENV_VAR } from 'src/constants';
 
@@ -197,7 +196,7 @@ function handleLine(socket: net.Socket, line: string): void {
 }
 
 function handleSpawn(socket: net.Socket, id: string, payloadUnknown: unknown): void {
-    const payload = parseSpawnPayload(payloadUnknown);
+    const payload = parseRuntimeSpawnPayload(payloadUnknown);
     if (!payload) {
         writeResponse(socket, {
             id,
@@ -227,7 +226,7 @@ function handleSpawn(socket: net.Socket, id: string, payloadUnknown: unknown): v
 }
 
 function handleWrite(socket: net.Socket, id: string, payloadUnknown: unknown): void {
-    const payload = parseWritePayload(payloadUnknown);
+    const payload = parseRuntimeWritePayload(payloadUnknown);
     if (!payload) {
         writeResponse(socket, {
             id,
@@ -248,11 +247,11 @@ function handleWrite(socket: net.Socket, id: string, payloadUnknown: unknown): v
         });
         return;
     }
-    writeResponse(socket, { id, type: 'write', ok: true, payload: {} });
+    writeResponse(socket, { id, type: 'write', ok: true, payload: createEmptyPayloadResponse('write') });
 }
 
 function handleResize(socket: net.Socket, id: string, payloadUnknown: unknown): void {
-    const payload = parseResizePayload(payloadUnknown);
+    const payload = parseRuntimeResizePayload(payloadUnknown);
     if (!payload) {
         writeResponse(socket, {
             id,
@@ -273,11 +272,11 @@ function handleResize(socket: net.Socket, id: string, payloadUnknown: unknown): 
         });
         return;
     }
-    writeResponse(socket, { id, type: 'resize', ok: true, payload: {} });
+    writeResponse(socket, { id, type: 'resize', ok: true, payload: createEmptyPayloadResponse('resize') });
 }
 
 function handleKill(socket: net.Socket, id: string, payloadUnknown: unknown): void {
-    const payload = parseKillPayload(payloadUnknown);
+    const payload = parseRuntimeKillPayload(payloadUnknown);
     if (!payload) {
         writeResponse(socket, {
             id,
@@ -298,7 +297,7 @@ function handleKill(socket: net.Socket, id: string, payloadUnknown: unknown): vo
         });
         return;
     }
-    writeResponse(socket, { id, type: 'kill', ok: true, payload: {} });
+    writeResponse(socket, { id, type: 'kill', ok: true, payload: createEmptyPayloadResponse('kill') });
 }
 
 function broadcastEvent(event: RuntimeEvent): void {
@@ -325,98 +324,4 @@ function writeSocketMessage(socket: net.Socket, value: RuntimeSocketMessage): vo
     } catch {
         // Ignore transient socket errors.
     }
-}
-
-function isRuntimeRequest(value: unknown): value is RuntimeRequest {
-    if (!isRecord(value)) {
-        return false;
-    }
-    return (
-        typeof value.id === 'string' &&
-        typeof value.type === 'string' &&
-        typeof value.authToken === 'string' &&
-        typeof value.protocolVersion === 'number' &&
-        Number.isFinite(value.protocolVersion)
-    );
-}
-
-function parseSpawnPayload(value: unknown): RuntimeSpawnPayload | null {
-    if (!isRecord(value)) {
-        return null;
-    }
-    if (
-        typeof value.command !== 'string' ||
-        !isStringArray(value.args) ||
-        typeof value.cwd !== 'string' ||
-        typeof value.cols !== 'number' ||
-        !Number.isFinite(value.cols) ||
-        typeof value.rows !== 'number' ||
-        !Number.isFinite(value.rows) ||
-        !isProcessEnv(value.env)
-    ) {
-        return null;
-    }
-    return {
-        command: value.command,
-        args: value.args,
-        cwd: value.cwd,
-        cols: value.cols,
-        rows: value.rows,
-        env: value.env,
-    };
-}
-
-function parseWritePayload(value: unknown): RuntimeWritePayload | null {
-    if (!isRecord(value)) {
-        return null;
-    }
-    if (typeof value.sessionId !== 'string' || typeof value.data !== 'string') {
-        return null;
-    }
-    return {
-        sessionId: value.sessionId,
-        data: value.data,
-    };
-}
-
-function parseResizePayload(value: unknown): RuntimeResizePayload | null {
-    if (!isRecord(value)) {
-        return null;
-    }
-    if (
-        typeof value.sessionId !== 'string' ||
-        typeof value.cols !== 'number' ||
-        !Number.isFinite(value.cols) ||
-        typeof value.rows !== 'number' ||
-        !Number.isFinite(value.rows)
-    ) {
-        return null;
-    }
-    return {
-        sessionId: value.sessionId,
-        cols: value.cols,
-        rows: value.rows,
-    };
-}
-
-function parseKillPayload(value: unknown): RuntimeKillPayload | null {
-    if (!isRecord(value) || typeof value.sessionId !== 'string') {
-        return null;
-    }
-    return { sessionId: value.sessionId };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is string[] {
-    return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
-}
-
-function isProcessEnv(value: unknown): value is Record<string, string | undefined> {
-    if (!isRecord(value)) {
-        return false;
-    }
-    return Object.values(value).every((entry) => entry === undefined || typeof entry === 'string');
 }

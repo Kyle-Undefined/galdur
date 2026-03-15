@@ -5,12 +5,13 @@ import {
     CliToolSettingsSpec,
     CommandResolution,
     GaldurSettings,
+    ToolExecutionContext,
     ToolPermissionModeOption,
     VaultPaths,
 } from '../types';
-import { resolveExecutable } from '../services/executableResolver';
+import { resolveCommandWithContext } from '../services/executableResolver';
 import { getToolLogPath } from './toolLogPath';
-import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
+import { expandCommonPaths, makeCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const CODEX_TOOL_ID = 'codex';
 const CODEX_DISPLAY_NAME = 'Codex';
@@ -21,28 +22,9 @@ const CODEX_BINARY_EXE = 'codex.exe';
 const CODEX_DEBUG_LOG_FILE = 'codex-debug.log';
 const CODEX_MISSING_CLI_HELP = `Set ${CODEX_OVERRIDE_ENV_VAR} or add Codex CLI to PATH, then restart Obsidian.`;
 
-const CODEX_PATH_NAMES_PREFER_CMD = [CODEX_BINARY_CMD, CODEX_BINARY_EXE] as const;
-const CODEX_PATH_NAMES_PREFER_EXE = [CODEX_BINARY_EXE, CODEX_BINARY_CMD] as const;
 const CODEX_PATH_CANDIDATES = [CODEX_BINARY_CMD, CODEX_BINARY_EXE, CODEX_BINARY] as const;
 
-const CODEX_COMMON_PATHS = [
-    { envVar: 'APPDATA', subPath: 'npm', names: CODEX_PATH_NAMES_PREFER_CMD },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.local/bin',
-        names: CODEX_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.bun/bin',
-        names: CODEX_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'LOCALAPPDATA',
-        subPath: 'pnpm',
-        names: CODEX_PATH_NAMES_PREFER_CMD,
-    },
-] as const;
+const CODEX_COMMON_PATHS = makeCommonPaths(CODEX_BINARY_CMD, CODEX_BINARY_EXE);
 
 const CODEX_PERMISSION_MODES: readonly ToolPermissionModeOption<CodexPermissionMode>[] = [
     { value: 'default', label: 'CLI default' },
@@ -68,13 +50,16 @@ export class CodexTool implements CliTool<'codex'> {
     public readonly id = CODEX_TOOL_ID;
     public readonly displayName = CODEX_DISPLAY_NAME;
 
-    public async resolveCommand(): Promise<CommandResolution> {
-        return await resolveExecutable({
-            overrideEnvVar: CODEX_OVERRIDE_ENV_VAR,
-            pathCandidates: [...CODEX_PATH_CANDIDATES],
-            commonPathCandidates: expandCommonPaths(CODEX_COMMON_PATHS),
-            fallbackCommand: CODEX_BINARY,
-        });
+    public async resolveCommand(context?: ToolExecutionContext): Promise<CommandResolution> {
+        return resolveCommandWithContext(
+            {
+                overrideEnvVar: CODEX_OVERRIDE_ENV_VAR,
+                pathCandidates: [...CODEX_PATH_CANDIDATES],
+                commonPathCandidates: context?.wslEnabled ? [] : expandCommonPaths(CODEX_COMMON_PATHS),
+                fallbackCommand: CODEX_BINARY,
+            },
+            context
+        );
     }
 
     public getDebugLogPath(vaultPaths: VaultPaths): string {

@@ -6,6 +6,7 @@ import {
     RUNTIME_RELEASE_REPO,
 } from '../../constants';
 import { Manager } from '../../services/runtime/Manager';
+import { isWslAvailable, listWslDistros } from '../../services/wsl';
 import { getStoredConnectTimeoutMs, normalizeConnectTimeoutMs } from '../../settings/settingsHelpers';
 import { GaldurSettingsStore, RuntimeInstallStatus } from '../../types';
 import { getVaultPaths } from '../../utils/vault';
@@ -30,6 +31,7 @@ type RuntimeSettingsSectionDeps = {
 
 export class RuntimeSettingsSection {
     private runtimeBusyAction: RuntimeAction | null = null;
+    private wslDistrosPromise: Promise<string[]> | null = null;
 
     public constructor(private readonly deps: RuntimeSettingsSectionDeps) {}
 
@@ -65,6 +67,69 @@ export class RuntimeSettingsSection {
                     await this.deps.saveNow();
                 });
             });
+
+        new Setting(containerEl)
+            .setName('WSL mode')
+            .setDesc('Resolve and launch CLI tools through `wsl.exe` while keeping the runtime on Windows.')
+            .addToggle((toggle) => {
+                toggle.setValue(this.deps.store.settings.wslEnabled).onChange(async (value) => {
+                    if (!value) {
+                        this.deps.store.settings.wslEnabled = false;
+                        await this.deps.saveNow();
+                        this.deps.refresh();
+                        return;
+                    }
+
+                    let available = false;
+                    try {
+                        available = await isWslAvailable();
+                    } catch (error) {
+                        toggle.setValue(false);
+                        this.deps.store.settings.wslEnabled = false;
+                        new Notice(`Failed to check WSL availability: ${String(error)}`, ERROR_NOTICE_DURATION_MS);
+                        return;
+                    }
+                    if (!available) {
+                        toggle.setValue(false);
+                        this.deps.store.settings.wslEnabled = false;
+                        new Notice(
+                            'WSL is not installed or not configured. Install WSL first.',
+                            ERROR_NOTICE_DURATION_MS
+                        );
+                        return;
+                    }
+
+                    this.deps.store.settings.wslEnabled = true;
+                    await this.deps.saveNow();
+                    new Notice('WSL detected');
+                    this.deps.refresh();
+                });
+            });
+
+        if (this.deps.store.settings.wslEnabled) {
+            const wslDistrosHintPromise = this.getWslDistros()
+                .then((distros) =>
+                    distros.length > 0
+                        ? `Available distros: ${distros.join(', ')}`
+                        : 'Optional distro name override. Leave empty to use the default distro.'
+                )
+                .catch(() => 'Optional distro name override. Leave empty to use the default distro.');
+            const distroSetting = new Setting(containerEl)
+                .setName('WSL distro')
+                .setDesc('Optional distro name override. Leave empty to use the default distro.');
+            distroSetting.addText((text) => {
+                text.setPlaceholder('(default)')
+                    .setValue(this.deps.store.settings.wslDistro)
+                    .onChange((value) => {
+                        this.deps.store.settings.wslDistro = value;
+                        this.deps.saveDebounced();
+                    });
+                text.inputEl.addClass('galdur-settings-input-full-width');
+                void wslDistrosHintPromise.then((description) => {
+                    distroSetting.setDesc(description);
+                });
+            });
+        }
 
         new Setting(containerEl)
             .setName('Connect timeout (ms)')
@@ -284,6 +349,14 @@ export class RuntimeSettingsSection {
             return;
         }
         addActionButton(setting, 'Install local runtime (dev)', 'installLocalExe', onClick);
+    }
+
+    private getWslDistros(): Promise<string[]> {
+        this.wslDistrosPromise ??= listWslDistros().catch((error) => {
+            this.wslDistrosPromise = null;
+            throw error;
+        });
+        return this.wslDistrosPromise;
     }
 
     private async openPath(path: string): Promise<void> {

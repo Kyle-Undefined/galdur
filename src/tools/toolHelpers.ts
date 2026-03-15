@@ -1,7 +1,16 @@
-import { join } from 'path';
+import { win32 } from 'path';
 import { tokenizeArgLine } from '../utils/cliArgs';
 
 export type CommonPathPattern = { envVar: string; subPath: string; names: readonly string[] };
+
+export function makeCommonPaths(binaryCmd: string, binaryExe: string): CommonPathPattern[] {
+    return [
+        { envVar: 'APPDATA', subPath: 'npm', names: [binaryCmd, binaryExe] },
+        { envVar: 'USERPROFILE', subPath: '.local/bin', names: [binaryExe, binaryCmd] },
+        { envVar: 'USERPROFILE', subPath: '.bun/bin', names: [binaryExe, binaryCmd] },
+        { envVar: 'LOCALAPPDATA', subPath: 'pnpm', names: [binaryCmd, binaryExe] },
+    ];
+}
 
 export function expandCommonPaths(patterns: readonly CommonPathPattern[]): string[] {
     const candidates: string[] = [];
@@ -10,8 +19,9 @@ export function expandCommonPaths(patterns: readonly CommonPathPattern[]): strin
         if (!base) {
             continue;
         }
+        // These candidates target Windows-hosted CLIs discovered from Windows env vars.
         for (const name of names) {
-            candidates.push(join(base, subPath, name));
+            candidates.push(win32.join(base, subPath, name));
         }
     }
     return candidates;

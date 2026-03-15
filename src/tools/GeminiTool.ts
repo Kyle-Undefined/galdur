@@ -5,12 +5,13 @@ import {
     CommandResolution,
     GaldurSettings,
     GeminiPermissionMode,
+    ToolExecutionContext,
     ToolPermissionModeOption,
     VaultPaths,
 } from '../types';
-import { resolveExecutable } from '../services/executableResolver';
+import { resolveCommandWithContext } from '../services/executableResolver';
 import { getToolLogPath } from './toolLogPath';
-import { expandCommonPaths, parseExtraArgs } from './toolHelpers';
+import { expandCommonPaths, makeCommonPaths, parseExtraArgs } from './toolHelpers';
 
 const GEMINI_TOOL_ID = 'gemini';
 const GEMINI_DISPLAY_NAME = 'Gemini';
@@ -21,28 +22,9 @@ const GEMINI_BINARY_EXE = 'gemini.exe';
 const GEMINI_DEBUG_LOG_FILE = 'gemini-debug.log';
 const GEMINI_MISSING_CLI_HELP = `Set ${GEMINI_OVERRIDE_ENV_VAR} or add Gemini CLI to PATH, then restart Obsidian.`;
 
-const GEMINI_PATH_NAMES_PREFER_CMD = [GEMINI_BINARY_CMD, GEMINI_BINARY_EXE] as const;
-const GEMINI_PATH_NAMES_PREFER_EXE = [GEMINI_BINARY_EXE, GEMINI_BINARY_CMD] as const;
 const GEMINI_PATH_CANDIDATES = [GEMINI_BINARY_CMD, GEMINI_BINARY_EXE, GEMINI_BINARY] as const;
 
-const GEMINI_COMMON_PATHS = [
-    { envVar: 'APPDATA', subPath: 'npm', names: GEMINI_PATH_NAMES_PREFER_CMD },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.local/bin',
-        names: GEMINI_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'USERPROFILE',
-        subPath: '.bun/bin',
-        names: GEMINI_PATH_NAMES_PREFER_EXE,
-    },
-    {
-        envVar: 'LOCALAPPDATA',
-        subPath: 'pnpm',
-        names: GEMINI_PATH_NAMES_PREFER_CMD,
-    },
-] as const;
+const GEMINI_COMMON_PATHS = makeCommonPaths(GEMINI_BINARY_CMD, GEMINI_BINARY_EXE);
 
 const GEMINI_PERMISSION_MODES: readonly ToolPermissionModeOption<GeminiPermissionMode>[] = [
     { value: 'default', label: 'CLI default' },
@@ -70,13 +52,16 @@ export class GeminiTool implements CliTool<'gemini'> {
     public readonly id = GEMINI_TOOL_ID;
     public readonly displayName = GEMINI_DISPLAY_NAME;
 
-    public async resolveCommand(): Promise<CommandResolution> {
-        return await resolveExecutable({
-            overrideEnvVar: GEMINI_OVERRIDE_ENV_VAR,
-            pathCandidates: [...GEMINI_PATH_CANDIDATES],
-            commonPathCandidates: expandCommonPaths(GEMINI_COMMON_PATHS),
-            fallbackCommand: GEMINI_BINARY,
-        });
+    public async resolveCommand(context?: ToolExecutionContext): Promise<CommandResolution> {
+        return resolveCommandWithContext(
+            {
+                overrideEnvVar: GEMINI_OVERRIDE_ENV_VAR,
+                pathCandidates: [...GEMINI_PATH_CANDIDATES],
+                commonPathCandidates: context?.wslEnabled ? [] : expandCommonPaths(GEMINI_COMMON_PATHS),
+                fallbackCommand: GEMINI_BINARY,
+            },
+            context
+        );
     }
 
     public getDebugLogPath(vaultPaths: VaultPaths): string {

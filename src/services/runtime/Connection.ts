@@ -1,14 +1,13 @@
 import { randomUUID } from 'crypto';
 import { Socket, connect } from 'net';
 import { IPC_MAX_LINE_LENGTH } from '../../constants';
-import { isRecord } from '../../utils/typeGuards';
 import {
     RuntimeCommandType,
     RuntimeEvent,
     RuntimeRequestPayloadMap,
-    RuntimeResponse,
     RuntimeResponsePayloadMap,
 } from '../../../shared/ipc-types';
+import { isResponsePayloadForType, isRuntimeSocketMessage } from '../../../shared/ipc-codecs';
 import { createRequest } from './createRequest';
 
 type PendingRequest = {
@@ -206,15 +205,12 @@ export class Connection {
             return;
         }
 
-        if (!isRecord(raw) || typeof raw.kind !== 'string') {
+        if (!isRuntimeSocketMessage(raw)) {
             return;
         }
 
         switch (raw.kind) {
             case 'response': {
-                if (!this.isRuntimeResponse(raw.response)) {
-                    return;
-                }
                 const response = raw.response;
                 const pending = this.pending.get(response.id);
                 if (!pending) {
@@ -237,9 +233,6 @@ export class Connection {
                 return;
             }
             case 'event': {
-                if (!this.isRuntimeEvent(raw.event)) {
-                    return;
-                }
                 const event = raw.event;
                 for (const listener of this.listeners) {
                     try {
@@ -250,91 +243,10 @@ export class Connection {
                 }
                 return;
             }
+            default: {
+                console.warn('[galdur] Unknown IPC message kind:', (raw as { kind: string }).kind);
+                return;
+            }
         }
-    }
-
-    private isRuntimeResponse(value: unknown): value is RuntimeResponse {
-        if (!isRecord(value)) {
-            return false;
-        }
-        if (typeof value.id !== 'string' || typeof value.ok !== 'boolean') {
-            return false;
-        }
-        if (!value.ok && value.error !== undefined && typeof value.error !== 'string') {
-            return false;
-        }
-        return true;
-    }
-
-    private isRuntimeEvent(value: unknown): value is RuntimeEvent {
-        if (!isRecord(value) || typeof value.event !== 'string') {
-            return false;
-        }
-        switch (value.event) {
-            case 'ready':
-                return isReadyPayload(value.payload);
-            case 'data':
-                return isDataPayload(value.payload);
-            case 'exit':
-                return isExitPayload(value.payload);
-            case 'error':
-                return isErrorPayload(value.payload);
-            default:
-                return false;
-        }
-    }
-}
-
-function isReadyPayload(value: unknown): value is { version: string } {
-    return isRecord(value) && typeof value.version === 'string';
-}
-
-function isDataPayload(value: unknown): value is { sessionId: string; data: string } {
-    return isRecord(value) && typeof value.sessionId === 'string' && typeof value.data === 'string';
-}
-
-function isExitPayload(value: unknown): value is {
-    sessionId: string;
-    event: { exitCode: number; signal?: number };
-} {
-    return (
-        isRecord(value) &&
-        typeof value.sessionId === 'string' &&
-        isRecord(value.event) &&
-        typeof value.event.exitCode === 'number' &&
-        Number.isFinite(value.event.exitCode) &&
-        (value.event.signal === undefined ||
-            (typeof value.event.signal === 'number' && Number.isFinite(value.event.signal)))
-    );
-}
-
-function isErrorPayload(value: unknown): value is { sessionId?: string; message: string } {
-    return (
-        isRecord(value) &&
-        typeof value.message === 'string' &&
-        (value.sessionId === undefined || typeof value.sessionId === 'string')
-    );
-}
-
-function isResponsePayloadForType<T extends RuntimeCommandType>(
-    type: T,
-    value: unknown
-): value is RuntimeResponsePayloadMap[T] {
-    switch (type) {
-        case 'ping':
-            return isRecord(value) && typeof value.version === 'string';
-        case 'spawn':
-            return (
-                isRecord(value) &&
-                typeof value.sessionId === 'string' &&
-                typeof value.pid === 'number' &&
-                Number.isFinite(value.pid)
-            );
-        case 'write':
-        case 'resize':
-        case 'kill':
-            return isRecord(value) && Object.keys(value).length === 0;
-        default:
-            return false;
     }
 }

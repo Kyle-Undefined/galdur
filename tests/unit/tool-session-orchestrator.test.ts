@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { join } from 'path';
+import { delimiter, join, win32 } from 'path';
 import { DEFAULT_SETTINGS, MIN_TERMINAL_COLS, MIN_TERMINAL_ROWS, TERM_ENV_VALUE } from '../../src/constants';
 import { orchestrateToolSessionLaunch } from '../../src/ui/terminal/toolSessionOrchestrator';
 import { createTempDir, removeTempDir } from '../helpers/tempDir';
@@ -11,6 +11,7 @@ import type {
     RuntimeBackend,
     RuntimeHealthResult,
     TerminalExitEvent,
+    ToolExecutionContext,
     TerminalSessionStartOptions,
     TerminalSessionStartResult,
     VaultPaths,
@@ -82,8 +83,9 @@ function createTool(
     resolution: CommandResolution,
     buildArgsImpl?: (debugFilePath?: string) => string[],
     spawnEnvOverrides?: NodeJS.ProcessEnv
-): CliTool & { buildArgCalls: Array<string | undefined> } {
+): CliTool & { buildArgCalls: Array<string | undefined>; resolveContexts: Array<ToolExecutionContext | undefined> } {
     const buildArgCalls: Array<string | undefined> = [];
+    const resolveContexts: Array<ToolExecutionContext | undefined> = [];
     const settingsSpec: CliToolSettingsSpec = {
         permissionModeLabel: 'Permission mode',
         permissionModes: [{ value: 'default', label: 'default' }],
@@ -98,11 +100,13 @@ function createTool(
         id: 'claude',
         displayName: 'Claude',
         buildArgCalls,
-        async resolveCommand() {
+        resolveContexts,
+        async resolveCommand(context) {
+            resolveContexts.push(context);
             return resolution;
         },
         getDebugLogPath(vaultPaths: VaultPaths) {
-            return join(vaultPaths.pluginDir, 'logs', 'claude-debug.log');
+            return win32.join(vaultPaths.pluginDir, 'logs', 'claude-debug.log');
         },
         buildArgs(_settings, debugFilePath) {
             buildArgCalls.push(debugFilePath);
@@ -216,6 +220,7 @@ test('orchestrateToolSessionLaunch prepares and starts a backend with clamped te
         assert.equal(result.pid, 4321);
         assert.equal(state.prepared.length, 1);
         assert.equal(state.backends[0], backend);
+        assert.deepEqual(tool.resolveContexts, [{ wslEnabled: false, wslDistro: '' }]);
         assert.deepEqual(tool.buildArgCalls, ['C:\\vault\\.obsidian\\plugins\\galdur\\logs\\claude-debug.log']);
         assert.equal(backend.startCalls.length, 1);
         assert.deepEqual(backend.startCalls[0].args, ['--model', 'sonnet']);
@@ -226,7 +231,7 @@ test('orchestrateToolSessionLaunch prepares and starts a backend with clamped te
         assert.equal(backend.startCalls[0].env.TERM, TERM_ENV_VALUE);
         assert.match(
             (backend.startCalls[0].env.Path ?? backend.startCalls[0].env.PATH ?? '') as string,
-            new RegExp(`^${escapeRegExp(tempDir)};`)
+            new RegExp(`^${escapeRegExp(tempDir)}${escapeRegExp(delimiter)}`)
         );
         assert.equal(result.launch.commandSource, 'PATH');
         assert.equal(result.launch.debugFilePath, 'C:\\vault\\.obsidian\\plugins\\galdur\\logs\\claude-debug.log');
@@ -274,6 +279,76 @@ test('orchestrateToolSessionLaunch appends context guard args after tool args', 
         'C:\\vault\\.obsidian\\plugins\\galdur\\context-guard\\claude-settings.json',
     ]);
     assert.equal(result.launch.contextGuard.supportLevel, 'enforced');
+});
+
+test('orchestrateToolSessionLaunch wraps the launch in wsl.exe and translates file paths in WSL mode', async () => {
+    const tool = createTool(
+        {
+            command: '/home/test/.local/bin/claude',
+            source: 'PATH',
+            attempts: [
+                "wsl.exe -- sh -lc 'for dir in \"$HOME/.local/bin\" \"$HOME/.bun/bin\" \"$HOME/.npm/bin\"; do if [ -x \"$dir/'\\''claude'\\''\" ]; then printf \"%s\\n\" \"$dir/'\\''claude'\\''\"; exit 0; fi; done'",
+                "wsl.exe -- bash -ic 'command -v -- '\\''claude'\\'''",
+                "wsl.exe -- bash -lc 'command -v -- '\\''claude'\\'''",
+            ],
+            found: true,
+        },
+        (debugFilePath) => ['--debug-file', debugFilePath ?? '']
+    );
+    const settings = cloneSettings();
+    settings.wslEnabled = true;
+    settings.wslDistro = 'Ubuntu';
+    settings.toolProfiles.claude.debugLoggingEnabled = true;
+    const { hooks } = createHooks();
+    const backend = createBackend({ ok: true, pid: 222 });
+
+    const result = await orchestrateToolSessionLaunch({
+        settings,
+        tool,
+        vaultPaths: createVaultPaths(),
+        contextGuard: {
+            excludedTags: ['private'],
+            excludedNotePaths: ['notes/private.md'],
+            toolArgs: ['--settings', 'C:\\vault\\.obsidian\\plugins\\galdur\\context-guard\\claude-settings.json'],
+            supportLevel: 'enforced',
+            supportMessage: '1 tagged note hidden via generated Claude permissions.',
+        },
+        terminal: { cols: 120, rows: 40 },
+        createBackend: () => backend,
+        isStale: () => false,
+        hooks,
+    });
+
+    assert.equal(result.kind, 'started');
+    if (result.kind !== 'started') {
+        return;
+    }
+
+    assert.deepEqual(tool.resolveContexts, [{ wslEnabled: true, wslDistro: 'Ubuntu' }]);
+    assert.deepEqual(tool.buildArgCalls, ['/mnt/c/vault/.obsidian/plugins/galdur/logs/claude-debug.log']);
+    assert.equal(backend.startCalls[0].command, 'wsl.exe');
+    assert.deepEqual(backend.startCalls[0].args, [
+        '--distribution',
+        'Ubuntu',
+        '--cd',
+        '/mnt/c/vault',
+        '--',
+        'env',
+        'PATH=/home/test/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+        '/home/test/.local/bin/claude',
+        '--debug-file',
+        '/mnt/c/vault/.obsidian/plugins/galdur/logs/claude-debug.log',
+        '--settings',
+        '/mnt/c/vault/.obsidian/plugins/galdur/context-guard/claude-settings.json',
+    ]);
+    assert.equal(backend.startCalls[0].cwd, 'C:\\vault');
+    assert.equal(backend.startCalls[0].env.TERM, TERM_ENV_VALUE);
+    assert.equal(
+        backend.startCalls[0].env.Path ?? backend.startCalls[0].env.PATH,
+        process.env.Path ?? process.env.PATH
+    );
+    assert.equal(result.launch.command, 'wsl.exe');
+    assert.equal(result.launch.debugFilePath, '/mnt/c/vault/.obsidian/plugins/galdur/logs/claude-debug.log');
 });
 
 test('orchestrateToolSessionLaunch merges tool-specific env overrides into the spawned process', async () => {

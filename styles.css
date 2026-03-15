@@ -47,6 +47,14 @@
     background: var(--interactive-hover);
 }
 
+.galdur-terminal-btn-secondary {
+    color: var(--text-muted);
+}
+
+.galdur-terminal-btn-secondary:hover {
+    color: var(--text-normal);
+}
+
 .galdur-terminal-icon-btn {
     display: inline-flex;
     align-items: center;
