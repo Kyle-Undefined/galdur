@@ -16,8 +16,9 @@ It also includes an optional global tag-based context guard. You can mark Obsidi
 
 - Obsidian Desktop
 - Windows x64 or arm64
-- Claude Code CLI, Codex CLI, Gemini CLI, and/or OpenCode CLI installed locally
+- Claude Code CLI, Codex CLI, Gemini CLI, and/or OpenCode CLI installed either on Windows or inside WSL
 - A one-time runtime install from `Settings -> Galdur`
+- Optional: WSL installed and configured if you want to run tools through Linux instead of native Windows
 
 ## What the runtime is
 
@@ -26,6 +27,8 @@ The runtime is a small local helper app that Galdur downloads and runs on your m
 In plain terms, it is the part that gives Galdur access to a real terminal. Obsidian plugins cannot host `node-pty` directly inside the main plugin process, so Galdur uses a separate packaged runtime for that job.
 
 The runtime does not contain Claude, Codex, OpenCode, or any model. It contains Galdur's terminal bridge code plus the `node-pty` dependency needed to start and manage terminal sessions. Galdur talks to that helper app locally, and the helper app launches the CLI tool you selected.
+
+If you enable `WSL mode` in settings, Galdur still uses the Windows runtime, but it resolves and launches the selected CLI through `wsl.exe`. This lets you keep your tool install inside your WSL distro while still using Galdur from Obsidian on Windows.
 
 ## Install the beta with BRAT
 
@@ -57,7 +60,9 @@ Release tags match `manifest.json` exactly, such as `1.0.1`.
 2. Install the runtime if it is not already installed.
 3. Configure any global context guard tags you want to apply across tools.
 4. Configure the tool profiles you want to use.
-5. Make sure the CLI you want to launch is available on `PATH`, or set its command/path override through your environment.
+5. Choose how you want to run the CLI:
+   - Native Windows: make sure the CLI is available on `PATH`, or set its command/path override through your environment.
+   - WSL: enable `Settings -> Galdur -> Runtime -> WSL mode`, optionally set `WSL distro`, and make sure the CLI is installed inside that distro.
 6. Open the Galdur panel from the ribbon icon or the command palette.
 
 ## Supported tools
@@ -130,16 +135,24 @@ If the panel says runtime setup is required, open `Settings -> Galdur` and selec
 
 ### CLI not found
 
-If Galdur cannot find the AI tool, install the CLI normally and restart Obsidian. On Windows, Galdur checks common install locations and `PATH`. You can also use the relevant environment override:
+If Galdur cannot find the AI tool, install the CLI normally and restart Obsidian.
+
+Without WSL mode, Galdur checks common Windows install locations and `PATH`.
+
+With WSL mode enabled, Galdur resolves the tool through `wsl.exe` and looks inside the selected distro. Leave `WSL distro` empty to use your default distro, or set it explicitly if the CLI is installed in a different one.
+
+You can also use the relevant environment override:
 
 - `GALDUR_CLAUDE_CMD`
 - `GALDUR_CODEX_CMD`
 - `GALDUR_GEMINI_CMD`
 - `GALDUR_OPENCODE_CMD`
 
-### Windows-only support
+### Windows host requirement
 
-The managed runtime currently supports Windows only. macOS and Linux are not supported in this release.
+The managed runtime currently supports Windows only. macOS and Linux are not supported as host platforms in this release.
+
+WSL is supported as an optional CLI execution target on Windows. In that mode, the runtime still runs on Windows, while the selected AI CLI runs inside your WSL distro.
 
 ## Development
 

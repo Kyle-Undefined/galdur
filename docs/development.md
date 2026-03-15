@@ -23,6 +23,25 @@
     npm run dev
     ```
 
+## WSL mode
+
+Galdur's host runtime is still Windows-only, but the plugin can optionally resolve and launch supported CLI tools through `wsl.exe`.
+
+This is useful when:
+
+- Obsidian is running on Windows
+- The managed Galdur runtime is installed on Windows
+- Your preferred AI CLI is installed inside a WSL distro instead of on native Windows
+
+Behavior summary:
+
+- `WSL mode` is configured in `Settings -> Galdur -> Runtime`
+- The optional `WSL distro` setting maps to `wsl.exe --distribution <name>`
+- The runtime process still runs on Windows
+- The vault working directory and generated plugin file paths are translated to `/mnt/<drive>/...` paths before launch
+- Context guard policy paths are also translated for Claude and Gemini when WSL mode is on
+- Command resolution prefers native Linux paths inside WSL and intentionally ignores `/mnt/...` mounted Windows shims
+
 ## Release versioning
 
 Use `bumpp` plus a small TypeScript post-step to keep plugin release metadata in sync:
@@ -53,6 +72,8 @@ In simple terms: the runtime is a small helper app that exists only to provide r
 - The plugin starts the runtime with a named pipe path and protocol version arguments, then sends an auth token through an environment variable.
 - The plugin and runtime communicate over a newline-delimited JSON IPC protocol for commands such as `ping`, `spawn`, `write`, `resize`, and `kill`.
 - The runtime owns `node-pty` and emits async session events back to the plugin over the same pipe.
+
+When `WSL mode` is enabled, the runtime still hosts the PTY on Windows, but the spawned tool command is wrapped with `wsl.exe`. In practice, that means Galdur keeps one Windows-side runtime architecture while allowing the AI CLI itself to execute in a Linux userspace.
 
 This split exists because Obsidian plugins run inside an Electron renderer process, while `node-pty` requires a real Node.js environment with native addon support.
 
@@ -144,6 +165,8 @@ npm run runtime:build:exe:x64
 npm run runtime:build:exe:arm64
 ```
 
+WSL mode does not change runtime packaging. The managed runtime artifacts are still Windows executables because `wsl.exe` bridging happens at tool launch time, not in the runtime build.
+
 Release artifacts expected by the plugin:
 
 - `galdur-runtime-windows-x64.zip`
@@ -185,4 +208,5 @@ That copies the local runtime bundle into the managed install location and sets 
 - The runtime still uses `node-pty`, but it runs outside the main plugin process.
 - Runtime installation and updates are handled from inside the plugin settings UI.
 - On Windows, Galdur currently forces `node-pty` to `winpty` mode with `useConpty: false` for compatibility with Obsidian's runtime environment.
+- WSL mode is an execution option for the AI CLI, not a native Linux host mode for the plugin runtime.
 - The context guard is launch-time policy generation, not a replacement for a true sandbox.
